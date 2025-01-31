@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+    environment:
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_DATA_DIR: /var/www/html/data
+    volumes:
+      - ${APPDATA_ROOT_DIR}/gold/nextcloud:/var/www/html
+      
+    ports:
+      - "8081:80"
+
+  nextcloud-db:
+    image: mysql:latest
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${NEXTCLOUD_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${NEXTCLOUD_MYSQL_DATABASE}
+      MYSQL_USER: ${NEXTCLOUD_MYSQL_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_MYSQL_PASSWORD}
+    volumes:
+      - ${APPDATA_ROOT_DIR}/gold/nextcloud-db:/var/lib/mysql
+
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
