@@ -10,5 +10,5 @@ services:
       DOMAIN: ${VAULTWARDEN_DOMAIN}
     volumes:
       - ${APPDATA_ROOT_DIR}/gold/vault:/data
-    ports:
-      - "8080:80"
+    # ports:
+    #   - "8080:80"

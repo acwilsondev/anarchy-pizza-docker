@@ -1,36 +1,43 @@
-version: "3.8"
+version: '3.9'
+
 services:
 
   nextcloud:
     image: nextcloud:latest
     container_name: nextcloud
-    restart: unless-stopped
+    restart: always
     depends_on:
       - nextcloud-db
     environment:
-      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS}
-      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
-      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
-      NEXTCLOUD_DATA_DIR: /var/www/html/data
+      # Database settings
+      - MYSQL_PASSWORD=nextcloud
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_HOST=nextcloud-db
+      - TRUSTED_DOMAINS=cloud.anarchy.pizza
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=cloud.anarchy.pizza
+      - TRUSTED_PROXIES=172.29.0.7,192.168.86.100
+      # (Optional) set up trusted domains later via config.php if needed
     volumes:
-      - ${APPDATA_ROOT_DIR}/gold/nextcloud:/var/www/html
-      
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+      - /storage/appdata/gold/nextcloud/data:/var/www/html/data
+      # (Optional) add a separate volume for custom config, apps, or data
     ports:
-      - "8081:80"
+      - 8085:80
 
   nextcloud-db:
-    image: mysql:latest
+    image: mariadb:latest
     container_name: nextcloud-db
-    restart: unless-stopped
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${NEXTCLOUD_MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${NEXTCLOUD_MYSQL_DATABASE}
-      MYSQL_USER: ${NEXTCLOUD_MYSQL_USER}
-      MYSQL_PASSWORD: ${NEXTCLOUD_MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=nextcloud
+      - MYSQL_PASSWORD=nextcloud
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
     volumes:
-      - ${APPDATA_ROOT_DIR}/gold/nextcloud-db:/var/lib/mysql
-
-  nextcloud-redis:
-    image: redis:alpine
-    container_name: nextcloud-redis
-    restart: unless-stopped
+      - /storage/appdata/gold/nextcloud-db:/var/lib/mysql\
+    networks:
+      default:
+        aliases:
+          - nextcloud-db

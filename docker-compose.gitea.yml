@@ -1,4 +1,3 @@
-// filepath: /home/aaron/anarchy-pizza-docker/docker-compose.gitea.yml
 version: "3.8"
 
 services:
@@ -31,6 +30,3 @@ services:
       GITEA__server__ROOT_URL: ${GITEA_ROOT_URL}
     volumes:
       - ${APPDATA_ROOT_DIR}/gold/gitea:/data
-    ports:
-      - "8082:3000"
-      - "8083:22"

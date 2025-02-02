@@ -5,8 +5,8 @@ services:
     image: portainer/portainer-ce:latest
     container_name: portainer
     restart: unless-stopped
-    ports:
-      - "9000:9000" # Portainer Web Interface
+    # ports:
+    #   - "9000:9000" # Portainer Web Interface
     volumes:
       - ${APPDATA_ROOT_DIR}/bronze/portainer:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -17,8 +17,6 @@ services:
     restart: unless-stopped
     environment:
       AGENT_CLUSTER_ADDR: tasks.portainer_agent
-    ports:
-      - "9001:9001" # Agent API
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/volumes:/var/lib/docker/volumes
