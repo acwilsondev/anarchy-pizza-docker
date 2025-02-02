@@ -7,4 +7,4 @@ services:
     ports:
       - 8085:80
     volumes:
-      - /storage/appdata/gold/otterwiki:/app-data
+      - ${APPDATA_ROOT_DIR}/gold/otterwiki:/app-data

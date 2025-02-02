@@ -9,7 +9,6 @@ services:
     depends_on:
       - nextcloud-db
     environment:
-      # Database settings
       - MYSQL_PASSWORD=nextcloud
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
@@ -18,11 +17,9 @@ services:
       - OVERWRITEPROTOCOL=https
       - OVERWRITEHOST=cloud.anarchy.pizza
       - TRUSTED_PROXIES=172.29.0.7,192.168.86.100
-      # (Optional) set up trusted domains later via config.php if needed
     volumes:
       - /storage/appdata/gold/nextcloud/html:/var/www/html
       - /storage/appdata/gold/nextcloud/data:/var/www/html/data
-      # (Optional) add a separate volume for custom config, apps, or data
     ports:
       - 8085:80
 

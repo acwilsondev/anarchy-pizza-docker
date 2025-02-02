@@ -6,9 +6,7 @@ services:
     container_name: vaultwarden
     restart: unless-stopped
     environment:
-      WEBSOCKET_ENABLED: "true" # Enable live updates
+      WEBSOCKET_ENABLED: "true"
       DOMAIN: ${VAULTWARDEN_DOMAIN}
     volumes:
       - ${APPDATA_ROOT_DIR}/gold/vault:/data
-    # ports:
-    #   - "8080:80"
