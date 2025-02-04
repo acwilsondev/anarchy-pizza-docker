@@ -12,8 +12,6 @@ services:
       resources:
         limits:
           memory: 256M
-    ports:
-      - 8086:8082
 
   commafeed-postgresql:
     image: postgres:latest

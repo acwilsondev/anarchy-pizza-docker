@@ -5,5 +5,3 @@ services:
     image: anarchy-pizza-blog:latest
     container_name: blog
     restart: always
-    ports:
-      - "8084:4000"

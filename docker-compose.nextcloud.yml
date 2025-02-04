@@ -20,8 +20,6 @@ services:
     volumes:
       - /storage/appdata/gold/nextcloud/html:/var/www/html
       - /storage/appdata/gold/nextcloud/data:/var/www/html/data
-    ports:
-      - 8085:80
 
   nextcloud-db:
     image: mariadb:latest
