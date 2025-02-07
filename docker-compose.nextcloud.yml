@@ -1,6 +1,26 @@
 version: '3.9'
 
 services:
+  nextcloud-app:
+    build: ./nextcloud
+    container_name: nextcloud-app
+    restart: always
+    ports:
+      - 5234:80
+    volumes:
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+      - /storage/appdata/gold/nextcloud/html/data:/var/www/html/data
+    environment:
+      - MYSQL_HOST=nextcloud-db
+    env_file:
+      - nextcloud.env
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    networks:
+      - default
+      - nextcloud_private
+
   nextcloud-db:
     image: mariadb:latest
     container_name: nextcloud-db
@@ -10,28 +30,19 @@ services:
       - /storage/appdata/gold/nextcloud-db:/var/lib/mysql
     env_file:
       - nextcloud.env
+    networks:
+      - nextcloud_private
 
   nextcloud-redis:
     image: redis
+    container_name: nextcloud-redis
     restart: always
-
-  nextcloud-app:
-    build: ./nextcloud
-    restart: always
-    ports:
-      - 5234:80
-    volumes:
-      - /storage/appdata/gold/nextcloud/html:/var/www/html
-    environment:
-      - MYSQL_HOST=nextcloud-db
-    env_file:
-      - nextcloud.env
-    depends_on:
-      - nextcloud-db
-      - nextcloud-redis
+    networks:
+      - nextcloud_private
 
   nextcloud-cron:
     build: ./nextcloud
+    container_name: nextcloud-cron
     restart: always
     volumes:
       - /storage/appdata/gold/nextcloud/html:/var/www/html
@@ -39,3 +50,9 @@ services:
     depends_on:
       - nextcloud-db
       - nextcloud-redis
+    networks:
+      - nextcloud_private
+
+networks:
+  nextcloud_private:
+    driver: bridge
