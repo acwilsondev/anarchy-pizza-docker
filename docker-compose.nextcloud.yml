@@ -1,38 +1,41 @@
 version: '3.9'
 
 services:
-
-  nextcloud:
-    image: nextcloud:latest
-    container_name: nextcloud
-    restart: always
-    depends_on:
-      - nextcloud-db
-    environment:
-      - MYSQL_PASSWORD=nextcloud
-      - MYSQL_DATABASE=nextcloud
-      - MYSQL_USER=nextcloud
-      - MYSQL_HOST=nextcloud-db
-      - TRUSTED_DOMAINS=cloud.anarchy.pizza
-      - OVERWRITEPROTOCOL=https
-      - OVERWRITEHOST=cloud.anarchy.pizza
-      - TRUSTED_PROXIES=172.29.0.7,192.168.86.100
-    volumes:
-      - /storage/appdata/gold/nextcloud/html:/var/www/html
-      - /storage/appdata/gold/nextcloud/data:/var/www/html/data
-
   nextcloud-db:
     image: mariadb:latest
     container_name: nextcloud-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
     restart: always
-    environment:
-      - MYSQL_ROOT_PASSWORD=nextcloud
-      - MYSQL_PASSWORD=nextcloud
-      - MYSQL_DATABASE=nextcloud
-      - MYSQL_USER=nextcloud
     volumes:
-      - /storage/appdata/gold/nextcloud-db:/var/lib/mysql\
-    networks:
-      default:
-        aliases:
-          - nextcloud-db
+      - /storage/appdata/gold/nextcloud-db:/var/lib/mysql
+    env_file:
+      - nextcloud.env
+
+  nextcloud-redis:
+    image: redis
+    restart: always
+
+  nextcloud-app:
+    build: ./nextcloud
+    restart: always
+    ports:
+      - 5234:80
+    volumes:
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+    environment:
+      - MYSQL_HOST=nextcloud-db
+    env_file:
+      - nextcloud.env
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+
+  nextcloud-cron:
+    build: ./nextcloud
+    restart: always
+    volumes:
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
