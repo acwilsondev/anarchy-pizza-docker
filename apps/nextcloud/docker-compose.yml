@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  nextcloud-app:
+    build: .
+    container_name: nextcloud-app
+    restart: always
+    ports:
+      - 5234:80
+    volumes:
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+      - /storage/appdata/gold/nextcloud/html/data:/var/www/html/data
+    environment:
+      - MYSQL_HOST=nextcloud-db
+    env_file:
+      - .env
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    networks:
+      - anarchy-pizza
+      - private
+
+  nextcloud-db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    volumes:
+      - /storage/appdata/gold/nextcloud-db:/var/lib/mysql
+    env_file:
+      - .env
+    networks:
+      - private
+
+  nextcloud-redis:
+    image: redis
+    container_name: nextcloud-redis
+    restart: always
+    networks:
+      - private
+
+  nextcloud-cron:
+    build: .
+    container_name: nextcloud-cron
+    restart: always
+    volumes:
+      - /storage/appdata/gold/nextcloud/html:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    networks:
+      - private
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza
+  private:
+    driver: bridge

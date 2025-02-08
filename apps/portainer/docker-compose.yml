@@ -1,0 +1,34 @@
+version: "3.8"
+services:
+  
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # Portainer Web Interface
+    volumes:
+      - /storage/appdata/bronze/portainer:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - anarchy-pizza
+
+  portainer-agent:
+    image: portainer/agent:latest
+    container_name: portainer_agent
+    restart: unless-stopped
+    environment:
+      AGENT_CLUSTER_ADDR: tasks.portainer_agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - /:/host
+    deploy:
+      mode: global
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza

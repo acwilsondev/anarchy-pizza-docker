@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+      - /storage/appdata/bronze/jellyfin/cache:/cache
+      - /storage/media:/media # Update this to your actual media directory
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Denver # Change to your timezone
