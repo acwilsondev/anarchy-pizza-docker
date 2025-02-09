@@ -6,10 +6,21 @@ services:
     container_name: jellyfin
     restart: unless-stopped
     volumes:
-      - ./config:/config
+      - /storage/appdata/bronze/jellyfin/config:/config
       - /storage/appdata/bronze/jellyfin/cache:/cache
-      - /storage/media:/media # Update this to your actual media directory
+      - /storage/media:/media 
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=America/Denver # Change to your timezone
+      - TZ=America/Denver 
+    networks:
+      - anarchy-pizza
+    ports:
+      - '8096:8096'
+      - '8920:8920'
+      - '7359:7359/udp'
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza

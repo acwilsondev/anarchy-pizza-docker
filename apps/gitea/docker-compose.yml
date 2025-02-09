@@ -3,13 +3,8 @@ version: "3.8"
 services:
   gitea-db:
     image: mysql:8
-    container_name: gitea-mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${GITEA_MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${GITEA_MYSQL_DATABASE}
-      MYSQL_USER: ${GITEA_MYSQL_USER}
-      MYSQL_PASSWORD: ${GITEA_MYSQL_PASSWORD}
+    container_name: gitea-db
+    restart: unless-stopped
     volumes:
       - /storage/appdata/gold/gitea-db:/var/lib/mysql
     env_file:
@@ -20,25 +15,18 @@ services:
   gitea:
     image: gitea/gitea:latest
     container_name: gitea
-    restart: always
+    restart: unless-stopped
     depends_on:
       - gitea-db
-    environment:
-      USER_UID: ${GITEA_USER_UID}
-      USER_GID: ${GITEA_USER_GID}
-      GITEA__database__DB_TYPE: ${GITEA_DB_TYPE}
-      GITEA__database__HOST: ${GITEA_DB_HOST}
-      GITEA__database__NAME: ${GITEA_DB_NAME}
-      GITEA__database__USER: ${GITEA_DB_USER}
-      GITEA__database__PASSWD: ${GITEA_DB_PASSWD}
-      GITEA__server__ROOT_URL: ${GITEA_ROOT_URL}
     volumes:
       - /storage/appdata/gold/gitea:/data
     networks:
-      - anarchy-pizza
       - private
+      - anarchy-pizza
     env_file:
       - .env
+    ports:
+      - 3000:3000
 
 networks:
   anarchy-pizza:

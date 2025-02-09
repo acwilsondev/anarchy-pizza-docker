@@ -7,7 +7,7 @@ services:
     ports:
       - '8080:80'
     volumes:
-      - /storage/silver/filebrowser/.database.db:/.database.db
+      - /storage/appdata/silver/filebrowser/.database.db:/.database.db
       - /storage:/srv
     networks:
       - anarchy-pizza

@@ -18,8 +18,8 @@ services:
       - nextcloud-db
       - nextcloud-redis
     networks:
-      - anarchy-pizza
       - private
+      - anarchy-pizza
 
   nextcloud-db:
     image: mariadb:latest
