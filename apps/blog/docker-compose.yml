@@ -6,7 +6,7 @@ services:
     container_name: blog
     restart: always
     networks:
-      - anarchy-pizzay
+      - anarchy-pizza
 
 networks:
   anarchy-pizza:
