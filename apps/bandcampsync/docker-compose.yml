@@ -1,0 +1,20 @@
+services:
+  bandcampsync:
+    image: ghcr.io/meeb/bandcampsync:latest
+    container_name: bandcampsync
+    restart: unless-stopped
+    volumes:
+      - /storage/appdata/bronze/bandcampsync:/config
+      - /storage/media/music:/downloads
+    environment:
+      - TZ=America/Denver
+      - PUID=1000
+      - PGID=1000
+      - RUN_DAILY_AT=1
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza
