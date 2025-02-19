@@ -4,8 +4,9 @@ services:
     image: filebrowser/filebrowser
     container_name: filebrowser
     restart: unless-stopped
+    user: "1000:1000"
     volumes:
-      - /storage/appdata/silver/filebrowser/.database.db:/.database.db
+      - /storage/appdata/silver/filebrowser/filebrowser.db:/database.db
       - /storage:/srv
     networks:
       - anarchy-pizza
