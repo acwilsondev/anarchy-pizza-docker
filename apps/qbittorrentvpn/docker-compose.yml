@@ -1,0 +1,36 @@
+version: '3'
+services:
+  qbittorrentvpn:
+    container_name: qbittorrentvpn
+    image: binhex/arch-qbittorrentvpn:latest
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_ENABLED=yes
+      - VPN_USER=${VPN_USER}
+      - VPN_PASS=${VPN_PASS}
+      - VPN_PROV=${VPN_PROV}
+      - VPN_CLIENT=${VPN_CLIENT}
+      - ENABLE_PRIVOXY=yes
+      - ENABLE_SOCKS=yes
+      - SOCKS_USER=${SOCKS_USER}
+      - SOCKS_PASS=${SOCKS_PASS}
+      - LAN_NETWORK=${LAN_NETWORK}
+      - NAME_SERVERS=${NAME_SERVERS}
+      - STRICT_PORT_FORWARD=yes
+      - WEBUI_PORT=8080
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Los_Angeles
+      - UMASK=000
+    volumes:
+      - /storage/appdata/silver/qbittorrentvpn/config:/config
+      - /storage/media/incoming:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 8080:8080
+      - 8118:8118
+      - 9118:9118
+      - 58946:58946
+      - 58946:58946/udp
+    restart: unless-stopped

@@ -1,0 +1,23 @@
+services:
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Denver
+      - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
+      - OAUTHLIB_RELAX_TOKEN_SCOPE=1 #optional
+    volumes:
+      - /storage/appdata/bronze/calibre-web:/config
+      - /storage/media/books:/books
+    ports:
+      - 8083:8083
+    restart: unless-stopped
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza
