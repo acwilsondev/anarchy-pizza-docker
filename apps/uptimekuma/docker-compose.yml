@@ -1,0 +1,17 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    restart: unless-stopped
+    volumes:
+      - /storage/appdata/bronze/uptime-kuma:/app/data
+    ports:
+      # <Host Port>:<Container Port>
+      - "3001:3001"
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    external:
+      name: anarchy-pizza
+

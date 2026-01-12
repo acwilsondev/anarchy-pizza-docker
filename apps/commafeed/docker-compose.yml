@@ -20,7 +20,7 @@ services:
     env_file:
       - .env
     volumes:
-      - /storage/appdata/silver/commafeed-postgresql:/var/lib/postgresql/data
+      - /storage/appdata/silver/commafeed-postgresql:/var/lib/postgresql
     networks:
       - private
 
