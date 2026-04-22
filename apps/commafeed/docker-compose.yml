@@ -1,0 +1,29 @@
+services:
+  commafeed:
+    image: athou/commafeed:latest-postgresql
+    container_name: commafeed
+    restart: unless-stopped
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - anarchy-pizza
+
+  commafeed-postgresql:
+    image: postgres:18
+    container_name: commafeed-postgresql
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_ROOT}/silver/commafeed-postgresql:/var/lib/postgresql
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

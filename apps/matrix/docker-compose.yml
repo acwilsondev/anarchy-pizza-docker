@@ -1,0 +1,37 @@
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_ROOT}/gold/synapse:/data
+    depends_on:
+      - synapse-postgresql
+    networks:
+      - private
+      - anarchy-pizza
+    # Only publish if you are NOT using a reverse proxy.
+    # If you use Traefik/Caddy/Nginx on anarchy-pizza, you can omit ports entirely.
+    # ports:
+    #   - "8008:8008"
+
+  synapse-postgresql:
+    image: postgres:18
+    container_name: synapse-postgresql
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_ROOT}/gold/synapse-postgresql:/var/lib/postgresql
+    networks:
+      - private
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true
+  private:
+    driver: bridge
+

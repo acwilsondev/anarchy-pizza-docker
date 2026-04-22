@@ -1,0 +1,26 @@
+services:
+  
+  npm:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"    # HTTP
+      - "443:443"  # HTTPS
+      - "81:81"    # NPM Web Interface
+    volumes:
+      - ${STORAGE_ROOT}/silver/nginx-proxy-manager:/data
+      - /etc/letsencrypt:/etc/letsencrypt
+    environment:
+      - TZ=${TZ}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

@@ -1,0 +1,24 @@
+services:
+  
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      WEBSOCKET_ENABLED: "true"
+      DOMAIN: ${VAULTWARDEN_DOMAIN}
+      TZ: ${TZ}
+    volumes:
+      - ${STORAGE_ROOT}/gold/vault:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

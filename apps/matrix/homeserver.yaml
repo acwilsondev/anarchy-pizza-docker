@@ -1,0 +1,36 @@
+server_name: "matrix.anarchy.pizza"
+
+pid_file: /data/homeserver.pid
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    password: BZPsJqgX8h0sa!86rbWx
+    database: synapse
+    host: synapse-postgresql
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/matrix.anarchy.pizza.log.config"
+media_store_path: /data/media_store
+signing_key_path: "/data/matrix.anarchy.pizza.signing.key"
+report_stats: false
+suppress_key_server_warning: true
+enable_registration: false
+federation_domain_whitelist: []
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+

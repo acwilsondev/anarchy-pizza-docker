@@ -1,0 +1,21 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    restart: unless-stopped
+    volumes:
+      - ${STORAGE_ROOT}/bronze/uptime-kuma:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    ports:
+      # <Host Port>:<Container Port>
+      - "3001:3001"
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true
+
