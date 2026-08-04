@@ -3,8 +3,8 @@ services:
     image: lscr.io/linuxserver/calibre-web:latest
     container_name: calibre-web
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID}
+      - PGID=${PGID}
       - TZ=America/Denver
       - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
       - OAUTHLIB_RELAX_TOKEN_SCOPE=1 #optional

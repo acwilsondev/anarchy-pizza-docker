@@ -8,8 +8,8 @@ services:
       - ${MEDIA_ROOT}/music:/downloads
     environment:
       - TZ=America/Denver
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID}
+      - PGID=${PGID}
       - RUN_DAILY_AT=1
     networks:
       - anarchy-pizza
