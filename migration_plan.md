@@ -542,20 +542,95 @@ root-caused, just sidestepped because the stakes changed. Worth
 retesting properly (large sustained transfer, watching for the same
 restart) before ever putting real precious data on this RustFS instance.
 
-**Final state:** MinIO fully decommissioned - containers stopped,
-`apps/minio` moved to `archived/minio`, its OIDC client removed from
-`identity_providers.yml`. Its 118GiB of data was deliberately **not**
-deleted, left intact at `${STORAGE_ROOT}/gold/minio` in case it's ever
-wanted back (same as every other archived app in this repo) - just
-unused, not destroyed. RustFS's S3 API moved onto MinIO's old port
-(`9008`) now that nothing else needs it, since there was never a
-migration to preserve continuity for. Console confirmed reachable
-(`https://rustfs.${DOMAIN}/rustfs/console/`, `200`) through Traefik.
-OIDC login itself is still **not actually tested end-to-end** - the
-consent-redirect check only proves structural validity, same standing
-caveat as Homarr's first pass, and this one carries extra uncertainty
-given the RustFS-specific `403 Signature required` bug found in the
-closed GitHub issue.
+**MinIO decommissioned:** containers stopped, `apps/minio` moved to
+`archived/minio`, its OIDC client removed from `identity_providers.yml`.
+Its 118GiB of data was deliberately **not** deleted, left intact at
+`${STORAGE_ROOT}/gold/minio` in case it's ever wanted back (same as
+every other archived app in this repo) - just unused, not destroyed.
+
+## RustFS OIDC debugging - four real bugs found, one unresolved, RustFS abandoned (2026-08-05)
+
+Pushed hard on getting RustFS's console OIDC actually working (not just
+config-that-looks-right, per the standing lesson from Vikunja) rather
+than stopping at the consent-redirect check. Along the way, built real
+tooling to verify this properly: completed a **full manual OIDC flow via
+curl** (login → authorization → GET `/api/oidc/consent?flow_id=` →
+POST the consent decision → follow the final redirect for a real
+authorization code → exchange it at `/api/oidc/token` with a genuine
+PKCE verifier) to inspect actual tokens rather than guessing - useful
+technique, worth reusing for Vaultwarden or any future OIDC app instead
+of stopping at "consent redirect returned so it's probably fine."
+
+**Bug 1 - wrong redirect URI.** Registered
+`.../oidc/callback` without a provider-id suffix, following a
+simplified GitHub issue example rather than the fuller docs. RustFS
+actually sends `.../oidc/callback/default` (it auto-assigns `default`
+as the provider id since none was explicitly configured). Confirmed the
+real value from Authelia's own rejection log rather than guessing again
+- **fixed**.
+
+**Bug 2 - client secret silently out of sync.** At some point during
+setup, the plaintext secret written to `apps/rustfs/.env` stopped
+matching the PBKDF2 hash stored in `identity_providers.yml` - never
+root-caused exactly where the drift happened, but caught it by manually
+completing the token exchange and getting `invalid_client`, then using
+`authelia crypto hash validate` to directly confirm the mismatch rather
+than assuming. Refixed carefully: generated a hex-only secret (no
+`+`/`=`/`/` characters, to eliminate any shell/YAML escaping as a
+variable), validated match at every single step before writing either
+file, confirmed byte-for-byte before deploying - **fixed, verified**.
+
+**Bug 3 - ID token had no `groups` claim at all.** Authelia 4.39+ stopped
+including claims in ID tokens by default (a real, documented behavior
+change) - `groups` was only ever in the `userinfo` response, and
+RustFS's OIDC handler (confirmed by reading its actual source on
+GitHub, `rustfs/src/admin/handlers/oidc.rs`) only processes the code
+exchange result, never calls `userinfo`. Fixed with an explicit
+`identity_providers.oidc.claims_policies` block naming which claims
+(`groups`, `email`, `preferred_username`, `name`) belong in the ID
+token, referenced from the client via `claims_policy: 'rustfs'`.
+Verified directly via the manual-flow tooling above: the ID token
+genuinely contained `"groups": ["admins", "lldap_admin"]` afterward -
+**fixed, verified**.
+
+**Bug 4 - policy mapping still never resolved, unresolved.** Even with a
+confirmed-correct `groups` claim reaching RustFS, `OIDC policy mapping
+did not resolve to current policies` persisted through three different
+claim-config permutations (`groups_claim` alone; adding `roles_claim`
+pointed at the same data; adding `claim_name` too - all three
+documented-but-differently-named RustFS settings for this). No richer
+detail available in RustFS's own debug-level logs beyond the generic
+error. This is very likely the same class of issue as a related open
+RustFS GitHub bug found earlier (#2612, OIDC + `consoleAdmin` policy
+behaving incorrectly) - a genuine gap in RustFS's beta policy-resolution
+code, not a configuration mistake on our end. **Not fixed, not
+root-caused** - stopped here rather than keep guessing at more
+undocumented env vars.
+
+**Decision: abandoned RustFS entirely**, not just the OIDC piece. Between
+this and the earlier untraced data-corruption-on-crash finding (see
+above), two independent, serious reliability problems surfaced in the
+time it took to attempt one integration - enough of a pattern to
+disqualify the beta software itself, not just work around one bug.
+`apps/rustfs` moved to `archived/rustfs`, its OIDC client and
+`claims_policies` block removed from `identity_providers.yml` and
+verified clean (`['vikunja', 'homarr']` only). Its data directories
+(`${STORAGE_ROOT}/gold/rustfs`, `${STORAGE_ROOT}/gold/rustfs-logs`) left
+on disk, untouched - never held anything but a throwaway sanity-test
+bucket, already cleaned up before archival.
+
+**Where this leaves S3-compatible storage: unresolved, deliberately
+deferred.** No object storage app is currently running in this stack.
+Earlier evaluation (SeaweedFS: mature but Console OIDC is Enterprise-
+gated; Garage: genuinely free, no official console, needs a third-party
+UI) still stands - see "MinIO → RustFS migration" above for that
+comparison. Worth revisiting with a bias toward **proven stability over
+native OIDC support** given how this round went - an Authelia
+forward-auth wrapper (the Dozzle/Uptime Kuma pattern) around a mature
+app's own login, regardless of whether that app has any SSO of its own,
+sidesteps this entire bug class and has worked cleanly every single time
+it's been used this session. Picking back up here was interrupted mid-
+discussion, not concluded - no next step has been decided yet.
 
 ## Status as of 2026-08-05
 
@@ -633,16 +708,6 @@ closed GitHub issue.
   "Homarr" above for the full setup, the Vikunja lessons applied up
   front, and the admin-group account-fragmentation issue hit and fixed
   after switching to OIDC-only.
-- `rustfs.anarchy.pizza` — RustFS Console (`apps/rustfs`), MinIO's
-  replacement. Third Tier 2/OIDC app - see "MinIO → RustFS migration"
-  above for why MinIO was replaced entirely rather than just having its
-  Console SSO issue worked around, and the real RustFS reliability
-  finding hit along the way. S3 API on `9008` (MinIO's old port),
-  untouched by Authelia. Console confirmed reachable at
-  `/rustfs/console/` (not the domain root). **OIDC login itself still
-  not confirmed end-to-end** - same standing caveat as every fresh OIDC
-  app, with extra uncertainty here given the RustFS-specific signature
-  bug found (and believed fixed, but not verified) during setup.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -656,13 +721,24 @@ closed GitHub issue.
   `apps/commafeed` moved to `archived/commafeed`. Postgres data left intact
   at `${STORAGE_ROOT}/silver/commafeed-postgresql` in case it's ever
   wanted back.
-- MinIO — replaced by RustFS (see "MinIO → RustFS migration" above).
-  Containers stopped/removed, `apps/minio` moved to `archived/minio`, its
-  OIDC client removed from `identity_providers.yml`. The 118GiB of data
-  that had been in it (Duplicati Windows backups, mostly) was confirmed
-  by Aaron as no longer needed and was **not** migrated - left intact,
+- MinIO — retired with no replacement currently running (see "MinIO →
+  RustFS migration" above). Containers stopped/removed, `apps/minio`
+  moved to `archived/minio`, its OIDC client removed from
+  `identity_providers.yml`. The 118GiB of data that had been in it
+  (Duplicati Windows backups, mostly) was confirmed by Aaron as no
+  longer needed and was **not** migrated anywhere - left intact,
   untouched, at `${STORAGE_ROOT}/gold/minio` in case it's ever wanted
   back, same treatment as every other archived app's data.
+- RustFS — abandoned during setup itself, never reached production use
+  (see "RustFS OIDC debugging" above for the full story: four real bugs
+  found and fixed getting OIDC working, a fifth that beat us, plus an
+  earlier untraced data-durability crash during the (ultimately
+  unneeded) data migration attempt). `apps/rustfs` moved to
+  `archived/rustfs`. Data directories
+  (`${STORAGE_ROOT}/gold/rustfs`, `${STORAGE_ROOT}/gold/rustfs-logs`)
+  left on disk, untouched - never held anything but an already-cleaned-up
+  sanity-test bucket. **No S3-compatible storage is currently running in
+  this stack** - deliberately deferred, not yet decided.
 
 **Cleanup TODO:**
 - ~~Stray leftover NPM proxy host with a typo~~ — resolved, Aaron deleted
@@ -761,13 +837,15 @@ add a second, redundant gate in front of their own login.
   from the start rather than migrating existing local accounts, so none
   of Vikunja's account-linking issues apply. Pending Aaron's real login
   to confirm the token exchange actually works — see "Homarr" above.
-- **Minio** — replaced entirely by **RustFS** after discovering MinIO's
-  open-source Console SSO was removed upstream (and the whole project
-  archived). Console OIDC configured, S3 API left on direct-port access
-  same as the original plan — scripts/rclone/etc. use access keys, not
-  browser auth. See "MinIO → RustFS migration" above, including a real
-  RustFS reliability finding hit and sidestepped (not resolved) along
-  the way.
+- **Minio/S3-compatible storage** — unresolved, not currently running.
+  MinIO's open-source Console SSO was removed upstream (and the whole
+  project archived), so it was replaced with RustFS - which was then
+  itself abandoned after real, unresolved OIDC and reliability problems
+  (see "MinIO → RustFS migration" and "RustFS OIDC debugging" above).
+  No object storage app is live in this stack right now. Next attempt
+  should bias toward proven-stable options (SeaweedFS, Garage) wrapped
+  in Authelia forward-auth rather than chasing another app's native
+  OIDC maturity.
 - **Vaultwarden** — upstream added native OIDC/SSO that actually flows
   through the real Bitwarden-compatible clients (not just the web vault).
   This is Vaultwarden doing its own OIDC handshake against Authelia as
@@ -802,19 +880,20 @@ add a second, redundant gate in front of their own login.
 
 ## Suggested next step
 
-Confirm RustFS's OIDC login actually works end-to-end for real (see
-"MinIO → RustFS migration" above — structurally valid per the consent
-check, genuinely untested past that point), create the new
-`rustfs.anarchy.pizza` NPM host. Separately, and not urgently since
-there's no real data on it yet: **actually root-cause the RustFS crash**
-rather than leaving it as "sidestepped because the data didn't matter" -
-a repeatable sustained-write test would answer whether it's safe to
-trust with anything real later. After that, Vaultwarden is the last
-Tier 2 candidate — its OIDC flows through the real Bitwarden-compatible
+**S3-compatible storage is an open decision, not started.** RustFS was
+abandoned (see "RustFS OIDC debugging" above) — no object storage app is
+currently running. When picked back up, bias toward proven stability
+over native OIDC support: SeaweedFS or Garage, wrapped in Authelia
+forward-auth (the Dozzle/Uptime Kuma pattern) rather than depending on
+either project's own SSO maturity. This was mid-discussion when the
+session moved on, not a settled decision.
+
+Separately, Vaultwarden is the last standing Tier 2 candidate from the
+original plan — its OIDC flows through the real Bitwarden-compatible
 clients, not just the web vault, a genuinely different integration
-surface than everything migrated so far, worth extra care testing an
-actual client app, not just the browser. Also worth a pass checking
-every OIDC app so far (Vikunja, Homarr, RustFS) for the two recurring
-gotcha classes hit this round: leftover local/pre-existing accounts not
-linked to the SSO identity, and OIDC group claims not matching the
-target app's expected group/policy/role name.
+surface than everything done so far, worth extra care testing an actual
+client app, not just the browser. Also worth a pass checking every live
+OIDC app (Vikunja, Homarr) for the two recurring gotcha classes hit this
+round: leftover local/pre-existing accounts not linked to the SSO
+identity, and OIDC group claims not matching the target app's expected
+group/policy/role name.
