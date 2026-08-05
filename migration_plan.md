@@ -472,6 +472,15 @@ again):**
   returns a plain `403`; the actual console lives at
   `https://rustfs.${DOMAIN}/rustfs/console/`. No redirect from root.
   Worth bookmarking the full path.
+- **Callback URL actually used includes a `/default` provider-id suffix**
+  RustFS wasn't given an explicit provider name (no such env var was
+  set), so it auto-assigns one - `default` - and bakes it into the
+  redirect URI it sends: `.../rustfs/admin/v3/oidc/callback/default`.
+  The first registered client omitted this suffix (following the
+  simplified example in a GitHub issue rather than the more general docs
+  page, which did mention a `<provider-id>` segment) and failed with
+  `invalid_request: redirect_uri does not match`. Confirmed the exact
+  value from Authelia's own error log rather than guessing again.
 - **PKCE is mandatory** (S256), unlike every other OIDC client registered
   so far (`require_pkce: false` for Vikunja/Homarr/MinIO) -
   `require_pkce: true` and `pkce_challenge_method: 'S256'` set on the
