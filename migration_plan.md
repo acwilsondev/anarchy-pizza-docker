@@ -179,31 +179,42 @@ account, not meant to represent a real person.
   **only read on first run**; changing them later requires deleting the
   `freshrss` container and `${STORAGE_ROOT}/silver/freshrss/data` volume
   and reinstalling. OPML import left to Aaron via the GUI.
+- `library.anarchy.pizza` — Calibre-web (`apps/calibre-web`). Traefik
+  labels added and container redeployed; header-auth itself is a UI-only
+  setting in Calibre-web with no env var/CLI equivalent (unlike FreshRSS),
+  so two manual steps remain on Aaron's side: (1) confirm/create a
+  Calibre-web account named exactly `aaron`, (2) in Calibre-web's Admin →
+  Edit Basic Configuration → Feature Configuration, check "Allow Reverse
+  Proxy Authentication" and set the header name to `Remote-User`. Plus the
+  usual NPM repoint (see Cleanup TODO). Not yet verified end-to-end like
+  FreshRSS was, since the account/header step is pending.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
 
 **Decommissioned:**
 - Portainer — torn down per Aaron's call (not migrated). Containers
-  stopped/removed, `apps/portainer` moved to `archived/portainer`
-  (`git mv`'d, staged — not committed yet as of this note). Data left
-  intact at `${STORAGE_ROOT}/bronze/portainer` in case it's ever wanted
-  back. Never had an NPM host, so no NPM cleanup was needed either.
+  stopped/removed, `apps/portainer` moved to `archived/portainer`. Data
+  left intact at `${STORAGE_ROOT}/bronze/portainer` in case it's ever
+  wanted back. Never had an NPM host, so no NPM cleanup was needed either.
 - CommaFeed — replaced by FreshRSS (see above). Containers stopped/removed,
-  `apps/commafeed` moved to `archived/commafeed` (`git mv`'d, staged — not
-  committed yet). Postgres data left intact at
-  `${STORAGE_ROOT}/silver/commafeed-postgresql` in case it's ever wanted
-  back.
+  `apps/commafeed` moved to `archived/commafeed`. Postgres data left intact
+  at `${STORAGE_ROOT}/silver/commafeed-postgresql` in case it's ever
+  wanted back.
 
 **Cleanup TODO:**
-- Stray leftover NPM proxy host with a typo —
-  `server_name uptime.anarchy.pizz;` (missing the final "a"), HTTP-only, no
-  SSL. Harmless (nothing resolves to it) but should be deleted in the NPM UI.
-- `news.anarchy.pizza`'s NPM proxy host still points its Forward
-  Hostname/IP at `commafeed:8082`, which no longer exists. **Manual step
-  needed:** in the NPM UI, edit that host → change Forward Hostname/IP to
-  `traefik`, Forward Port to `8080` (SSL/Force SSL already configured on
-  that host from the CommaFeed days, no cert changes needed).
+- ~~Stray leftover NPM proxy host with a typo~~ — resolved, Aaron deleted
+  it (confirmed gone from
+  `nginx/proxy_host/` on disk, no `27.conf` and nothing references
+  `anarchy.pizz` anymore).
+- ~~`news.anarchy.pizza`'s NPM proxy host repoint~~ — resolved, confirmed
+  live (`302` redirect to Authelia instead of the earlier `502`).
+- `library.anarchy.pizza`'s NPM proxy host still points its Forward
+  Hostname/IP at `calibre-web:8083` directly. **Manual step needed:** in
+  the NPM UI, edit that host → change Forward Hostname/IP to `traefik`,
+  Forward Port to `8080` (SSL/Force SSL already configured on that host,
+  no cert changes needed) — same repoint as every prior app, plus the
+  Calibre-web account/header steps noted above.
 
 ## Candidate apps for Authelia — ranked
 
@@ -241,13 +252,16 @@ second, redundant gate in front of their own login.
   about official clients bypassing browser login.
 
 ### Tier 3 — has header-based reverse-proxy auth support
-- **Calibre-web** — has a real "Allow Reverse Proxy Authentication" option
-  that trusts a header (Authelia already sends `Remote-User` etc. via
-  `authResponseHeaders` on the middleware). Catch: the username must
-  **already exist** in Calibre-web's own user DB — no auto-provisioning,
-  so create the account once first, then point it at the `Remote-User`
-  header. Also: Calibre-web must not be reachable except through the
-  proxy, or anyone hitting it directly could spoof the header.
+- **Calibre-web** — Traefik labels added, container redeployed (see
+  Status above). Unlike FreshRSS, the "Allow Reverse Proxy
+  Authentication" toggle and header name are UI-only settings (no env
+  var/CLI equivalent), so the account + header config is a manual step
+  left to Aaron. Catch: the username must **already exist** in
+  Calibre-web's own user DB — no auto-provisioning. Also: Calibre-web
+  must not be reachable except through the proxy, or anyone hitting it
+  directly could spoof the header (true of any header-auth app — worth
+  double-checking none of these have a stray direct host port exposed
+  once the NPM repoint is done).
 
 ### Tier 4 — no viable SSO path found
 - ~~**CommaFeed**~~ — resolved by replacing it with FreshRSS (Tier 1b
@@ -257,8 +271,10 @@ second, redundant gate in front of their own login.
 
 ## Suggested next step
 
-Calibre-web is the natural next pilot — same header-auth pattern as
-FreshRSS, just needs the one-time "create the account, flip on header
-trust" step on the app side. Vikunja/Minio/Vaultwarden OIDC is a
-separate, bigger effort (Authelia-as-IdP setup) worth doing as its own
+Finish the Calibre-web manual steps (account + header toggle + NPM
+repoint) above, then verify it end-to-end the same way FreshRSS was
+verified (curl through Traefik with a real Authelia session cookie,
+confirm a `200` landing in the app rather than a login form).
+Vikunja/Minio/Vaultwarden OIDC is a separate, bigger effort
+(Authelia-as-IdP setup) worth doing as its own
 session rather than folding into the forward-auth rollout.

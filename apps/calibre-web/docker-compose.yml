@@ -14,6 +14,12 @@ services:
     ports:
       - 8083:8083
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.calibreweb.rule=Host(`library.${DOMAIN}`)
+      - traefik.http.routers.calibreweb.entrypoints=web
+      - traefik.http.routers.calibreweb.middlewares=authelia@docker
+      - traefik.http.services.calibreweb.loadbalancer.server.port=8083
     networks:
       - anarchy-pizza
 
