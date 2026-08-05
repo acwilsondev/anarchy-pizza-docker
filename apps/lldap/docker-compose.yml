@@ -1,0 +1,39 @@
+services:
+
+  lldap:
+    image: lldap/lldap:stable
+    container_name: lldap
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - LLDAP_LDAP_BASE_DN=${LLDAP_BASE_DN}
+      - LLDAP_LDAP_USER_EMAIL=${LLDAP_ADMIN_EMAIL}
+      - LLDAP_LDAP_USER_PASS=${LLDAP_ADMIN_PASSWORD}
+      - LLDAP_JWT_SECRET_FILE=/secrets/jwt_secret
+      - LLDAP_KEY_SEED_FILE=/secrets/key_seed
+      # Used only when manually running /app/bootstrap.sh (see migration_plan.md)
+      - LLDAP_ADMIN_USERNAME=admin
+      - LLDAP_ADMIN_PASSWORD=${LLDAP_ADMIN_PASSWORD}
+      - USER_CONFIGS_DIR=/bootstrap/user-configs
+      - GROUP_CONFIGS_DIR=/bootstrap/group-configs
+    volumes:
+      - ${STORAGE_ROOT}/silver/lldap/data:/data
+      - ${STORAGE_ROOT}/silver/lldap/secrets:/secrets:ro
+      - ${STORAGE_ROOT}/silver/lldap/bootstrap:/bootstrap:ro
+    ports:
+      # LDAP and the admin web UI are intentionally NOT routed through
+      # Traefik/NPM - bound only to this host's Tailscale interface, so
+      # the UI is reachable at http://${TAILSCALE_IP}:17170 from tailnet
+      # devices only, never the public internet or plain LAN.
+      - "${TAILSCALE_IP}:17170:17170"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

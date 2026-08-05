@@ -1,0 +1,53 @@
+theme: light
+
+server:
+  address: 'tcp://:9091'
+
+log:
+  level: info
+
+totp:
+  issuer: anarchy.pizza
+
+authentication_backend:
+  ldap:
+    implementation: 'lldap'
+    address: 'ldap://lldap:3890'
+    base_dn: 'dc=anarchy,dc=pizza'
+    user: 'uid=authelia,ou=people,dc=anarchy,dc=pizza'
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: "dozzle.anarchy.pizza"
+      subject: "group:users"
+      policy: deny
+    - domain: "uptime.anarchy.pizza"
+      subject: "group:users"
+      policy: deny
+    - domain: "*.anarchy.pizza"
+      subject: "group:admins"
+      policy: one_factor
+    - domain: "*.anarchy.pizza"
+      subject: "group:users"
+      policy: one_factor
+
+session:
+  cookies:
+    - domain: anarchy.pizza
+      authelia_url: "https://auth.anarchy.pizza"
+      expiration: 1h
+      inactivity: 5m
+
+regulation:
+  max_retries: 3
+  find_time: 2m
+  ban_time: 5m
+
+storage:
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt
