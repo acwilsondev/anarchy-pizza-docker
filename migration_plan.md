@@ -892,6 +892,76 @@ caught along the way: redeploying without Vaultwarden's own local `.env`
 (only the root one) silently drops `VAULTWARDEN_DOMAIN` - both
 `--env-file` flags matter, same as every other app in this repo.
 
+## Incident: NPM→Traefik cutover prep took all 8 public sites down briefly (2026-08-05)
+
+Working through the plan to eventually drop NPM entirely and have Traefik
+own public TLS directly (Let's Encrypt via Traefik's built-in ACME,
+ports 80/443 moving from NPM to Traefik). Phase 1 was supposed to be
+pure prep with zero live impact: add a `websecure` (`:443`) entrypoint
+and cert resolver to Traefik's static config, and add that entrypoint to
+each app's *existing* router alongside the current internal `web`
+(`:8080`) entrypoint - `entrypoints=web,websecure` plus
+`tls.certresolver=le` on the same router object. Reasoning at the time:
+since the new entrypoints weren't published to the host, this seemed
+purely additive.
+
+**It wasn't.** Traefik applies a router's TLS configuration across all
+of that router's entrypoints, not per-entrypoint - adding
+`tls.certresolver` to a router that also lists a plain (non-TLS)
+entrypoint broke that entrypoint too. All 8 apps on the `web` entrypoint
+(the exact path NPM uses right now for real public traffic) started
+returning `404` - confirmed via direct external `curl` against the real
+public domains, not just the internal test harness used throughout this
+whole session, so **this was real, live downtime**, not a simulated
+one. Caught within roughly a minute, reverted all 8 apps back to their
+exact prior config, redeployed, and confirmed recovery the same way -
+externally, against the real domains, not just internally.
+
+**Root cause of the mistake:** assumed a comma-separated `entrypoints`
+list on one router was purely additive without verifying it before
+touching apps that real live traffic depends on. That assumption was
+wrong, and - critically - Phase 1 of the plan was pitched as "no live
+impact," which stopped the usual caution that would otherwise apply to
+anything touching the live path. **The lesson: "no live impact" is a
+claim to verify, not assume, especially for changes to a router/config
+object that live traffic already depends on** - even when the *new*
+thing being added (the extra entrypoint) isn't itself live yet.
+
+**Correct approach going forward:** a second, separately-named router
+per app for the public HTTPS path (`<name>-secure`, pointed at the same
+service via `traefik.http.routers.<name>-secure.service=<name>`),
+rather than modifying the router real traffic already flows through.
+Validate the new router via the container network first (Traefik listens
+on its `websecure` entrypoint internally regardless of whether the host
+port is published, so it's reachable container-to-container even before
+cutover) before ever touching the existing router's config again.
+
+**Redone correctly and validated:** all 8 apps got a separate `<name>-secure`
+router added purely additively (existing `<name>` router's lines never
+touched), confirmed by diff before redeploying. After redeploying,
+checked the live public path *first* this time (all 8 domains, external
+curl, before anything else) - unaffected, exactly as it should have been
+the first time. Then validated every new `-secure` router in isolation,
+container-to-container (`docker exec npm curl -sk -H "Host: ..."
+https://traefik:443`, `-k` since no real cert exists yet - port 80 still
+belongs to NPM, so ACME can't succeed until actual cutover, but the
+routing logic itself is fully verifiable without it) - all 8 returned the
+same response code as their live counterpart.
+
+**One more gotcha along the way, same root cause as ever:** Vaultwarden's
+new router initially 404'd on this isolation test even though its config
+looked correct. Cause: its labels had been added to the compose file
+earlier but the container was never actually redeployed afterward - a
+label change in a compose file does nothing until the container is
+recreated, the same lesson as the Authelia bind-mount gotcha from much
+earlier in this rollout, just in a new spot. Redeployed, confirmed
+working the same way as the other 8.
+
+**Status: Phase 1 (prep) now genuinely complete and validated**, unlike
+the first attempt. Phase 2 (isolated validation) effectively happened as
+part of fixing Phase 1. Phase 3 (the actual cutover - stop NPM, publish
+80/443 on Traefik) has **not** been attempted yet.
+
 ## Suggested next step
 
 **S3-compatible storage is an open decision, not started.** RustFS was

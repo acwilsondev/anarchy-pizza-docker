@@ -32,6 +32,10 @@ services:
       - traefik.http.routers.homarr.rule=Host(`homarr.${DOMAIN}`)
       - traefik.http.routers.homarr.entrypoints=web
       - traefik.http.services.homarr.loadbalancer.server.port=7575
+      - traefik.http.routers.homarr-secure.rule=Host(`homarr.${DOMAIN}`)
+      - traefik.http.routers.homarr-secure.entrypoints=websecure
+      - traefik.http.routers.homarr-secure.tls.certresolver=le
+      - traefik.http.routers.homarr-secure.service=homarr
     deploy:
       resources:
         limits:

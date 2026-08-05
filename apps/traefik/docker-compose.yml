@@ -8,13 +8,26 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=anarchy-pizza
+      # Internal NPM-facing entrypoint - unchanged, still used until NPM
+      # is actually dropped (see migration_plan.md's NPM cutover plan).
       - --entrypoints.web.address=:8080
       - --entrypoints.web.forwardedHeaders.trustedIPs=172.25.0.0/16
+      # New public entrypoints for the NPM cutover - not yet published to
+      # the host (see ports: below), added here ahead of time so config
+      # can be validated before anything goes live.
+      - --entrypoints.webinsecure.address=:80
+      - --entrypoints.webinsecure.http.redirections.entrypoint.to=websecure
+      - --entrypoints.webinsecure.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=acwilsoncs@gmail.com
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=webinsecure
       - --log.level=INFO
     environment:
       - TZ=${TZ}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${STORAGE_ROOT}/silver/traefik/acme.json:/letsencrypt/acme.json
     deploy:
       resources:
         limits:

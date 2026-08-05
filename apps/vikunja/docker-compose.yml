@@ -18,6 +18,10 @@ services:
       - traefik.http.routers.vikunja.rule=Host(`vikunja.${DOMAIN}`)
       - traefik.http.routers.vikunja.entrypoints=web
       - traefik.http.services.vikunja.loadbalancer.server.port=3456
+      - traefik.http.routers.vikunja-secure.rule=Host(`vikunja.${DOMAIN}`)
+      - traefik.http.routers.vikunja-secure.entrypoints=websecure
+      - traefik.http.routers.vikunja-secure.tls.certresolver=le
+      - traefik.http.routers.vikunja-secure.service=vikunja
     deploy:
       resources:
         limits:

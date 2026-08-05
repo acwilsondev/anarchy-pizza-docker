@@ -15,6 +15,12 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vaultwarden.rule=Host(`vault.${DOMAIN}`)
+      - traefik.http.routers.vaultwarden.entrypoints=websecure
+      - traefik.http.routers.vaultwarden.tls.certresolver=le
+      - traefik.http.services.vaultwarden.loadbalancer.server.port=80
     networks:
       - anarchy-pizza
 

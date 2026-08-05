@@ -18,6 +18,11 @@ services:
       - traefik.http.routers.calibreweb.entrypoints=web
       - traefik.http.routers.calibreweb.middlewares=authelia@docker
       - traefik.http.services.calibreweb.loadbalancer.server.port=8083
+      - traefik.http.routers.calibreweb-secure.rule=Host(`library.${DOMAIN}`)
+      - traefik.http.routers.calibreweb-secure.entrypoints=websecure
+      - traefik.http.routers.calibreweb-secure.tls.certresolver=le
+      - traefik.http.routers.calibreweb-secure.service=calibreweb
+      - traefik.http.routers.calibreweb-secure.middlewares=authelia@docker
     networks:
       - anarchy-pizza
 

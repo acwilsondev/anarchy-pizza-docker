@@ -12,6 +12,11 @@ services:
       - traefik.http.routers.dozzle.entrypoints=web
       - traefik.http.routers.dozzle.middlewares=authelia@docker
       - traefik.http.services.dozzle.loadbalancer.server.port=8080
+      - traefik.http.routers.dozzle-secure.rule=Host(`dozzle.${DOMAIN}`)
+      - traefik.http.routers.dozzle-secure.entrypoints=websecure
+      - traefik.http.routers.dozzle-secure.tls.certresolver=le
+      - traefik.http.routers.dozzle-secure.service=dozzle
+      - traefik.http.routers.dozzle-secure.middlewares=authelia@docker
     networks:
       - anarchy-pizza
 

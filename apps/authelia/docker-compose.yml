@@ -24,6 +24,10 @@ services:
       - traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)
       - traefik.http.routers.authelia.entrypoints=web
       - traefik.http.services.authelia.loadbalancer.server.port=9091
+      - traefik.http.routers.authelia-secure.rule=Host(`auth.${DOMAIN}`)
+      - traefik.http.routers.authelia-secure.entrypoints=websecure
+      - traefik.http.routers.authelia-secure.tls.certresolver=le
+      - traefik.http.routers.authelia-secure.service=authelia
       - traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://auth.${DOMAIN}/
       - traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true
       - traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email
