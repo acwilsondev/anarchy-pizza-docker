@@ -352,6 +352,58 @@ first-run flow** (anything that seeds a local admin account on first
 boot, independent of the auth-provider config) - the same
 account-fragmentation pattern could recur.
 
+## MinIO Console (added 2026-08-05)
+
+Third Tier 2/OIDC app, and the first that already existed and was
+running before this rollout (unlike Homarr) but had **never had an NPM
+host at all** - reachable only via direct host ports (`9008` S3 API,
+`9009` Console), no domain, no TLS. Console now goes through
+Traefik/Authelia like everything else; **the S3 API stays exactly as it
+was, untouched, still on its direct port** - deliberate, not an
+oversight. Scripts/rclone/backup jobs use access-key auth, not a
+browser, so OIDC doesn't apply there and putting it behind Authelia
+would just break them. Removed the Console's port publish (`9009`) once
+Traefik could reach it internally, same as every other app that had a
+leftover direct port.
+
+**Same group-name-matching gotcha as Homarr, caught this time before it
+bit anyone:** MinIO maps the OIDC `groups` claim directly to **MinIO
+policy names** for console permissions - it doesn't auto-provision
+access, so an LLDAP group with no identically-named MinIO policy gets
+nothing. Cloned the built-in `consoleAdmin` policy (`mc admin policy info
+localadmin consoleAdmin`) into a new policy literally named `admins`
+(`mc admin policy create localadmin admins <policy.json>`) to match
+LLDAP's group name, mirroring the fix already made for Homarr. Deliberately
+did **not** create a `users` policy - MinIO holds real data (`gold` tier
+storage), so the `users` LLDAP group getting no console access at all by
+default is the correct safe posture, not a gap to fill.
+
+**Authelia-specific client settings** (from Authelia's own MinIO
+integration notes, not the generic OIDC client template):
+`access_token_signed_response_alg: 'none'` and
+`userinfo_signed_response_alg: 'none'`, plus
+`MINIO_IDENTITY_OPENID_CLAIM_USERINFO=on` on MinIO's side - Authelia's
+docs flag MinIO as not fully honoring standard OIDC claim retrieval
+(same underlying class of issue as Homarr's `FORCE_USERINFO`, different
+client, same root cause).
+
+**Gotcha, unrelated to OIDC:** the `mc alias` used to create the
+`admins` policy is **not** persisted - it's local `mc` CLI config inside
+the container, not part of MinIO's own data on the `${STORAGE_ROOT}/gold/minio`
+volume. Recreating the container loses the alias (confirmed: had to
+re-run `mc alias set` after the compose redeploy) but **not** the policy
+itself, which lives in MinIO's own IAM data and does persist. Don't
+mistake a missing alias for a lost policy.
+
+**Not yet confirmed end-to-end** - same honest caveat as Homarr's first
+pass: discovery/routing checks pass, container started cleanly with no
+OIDC config errors in its logs, but the actual login (and specifically
+whether the `admins` policy grants the expected console permissions) is
+still Aaron's to confirm. New NPM host needed too - `minio.anarchy.pizza`
+never existed as a proxy host before this, so it needs creating from
+scratch (Forward Hostname/IP `traefik`, Port `8080`, request a cert,
+Force SSL) rather than repointing an existing one.
+
 ## Status as of 2026-08-05
 
 **Live behind Traefik + Authelia, LDAP-backed, role-restricted:**
@@ -428,6 +480,11 @@ account-fragmentation pattern could recur.
   "Homarr" above for the full setup, the Vikunja lessons applied up
   front, and the admin-group account-fragmentation issue hit and fixed
   after switching to OIDC-only.
+- `minio.anarchy.pizza` — MinIO Console (`apps/minio`). Third Tier 2/OIDC
+  app - see "MinIO Console" above. S3 API deliberately untouched, still
+  direct-port (`9008`), not behind Authelia. Pending Aaron's login to
+  confirm end-to-end, including that the `admins` MinIO policy actually
+  grants the expected access.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -539,9 +596,9 @@ add a second, redundant gate in front of their own login.
   from the start rather than migrating existing local accounts, so none
   of Vikunja's account-linking issues apply. Pending Aaron's real login
   to confirm the token exchange actually works — see "Homarr" above.
-- **Minio** (Console only) — OIDC via `AssumeRoleWithWebIdentity`. Do
-  **not** put the S3 API endpoint behind Authelia/OIDC — scripts/rclone/etc.
-  use access keys, not browser auth, and would break.
+- **Minio** — done, Console only. S3 API left exactly as it was,
+  deliberately not behind Authelia/OIDC — scripts/rclone/etc. use access
+  keys, not browser auth, and would break. See "MinIO Console" above.
 - **Vaultwarden** — upstream added native OIDC/SSO that actually flows
   through the real Bitwarden-compatible clients (not just the web vault).
   This is Vaultwarden doing its own OIDC handshake against Authelia as
@@ -576,13 +633,14 @@ add a second, redundant gate in front of their own login.
 
 ## Suggested next step
 
-Finish Vikunja's manual consent click-through and NPM repoint (see
-Cleanup TODO above), then Minio and Vaultwarden are what's left —
-Authelia's OIDC provider is already live, so it's "just" per-app client
-registration + app-side config now, the same pattern as Vikunja, not the
-bigger from-scratch OIDC setup this round required. Minio: Console only,
-never the S3 API endpoint (scripts/rclone use access keys, not browser
-auth). Vaultwarden: its OIDC flows through the real Bitwarden-compatible
-clients, not just the web vault — a genuinely different integration
-surface than Vikunja's browser-only login, worth extra care testing an
-actual client app, not just the browser.
+Confirm Homarr and MinIO both work end-to-end for real (Homarr: done.
+MinIO: pending — see "MinIO Console" above), create the new
+`minio.anarchy.pizza` NPM host. After that, Vaultwarden is the last
+Tier 2 candidate — its OIDC flows through the real Bitwarden-compatible
+clients, not just the web vault, a genuinely different integration
+surface than everything migrated so far, worth extra care testing an
+actual client app, not just the browser. Also worth a pass checking
+every OIDC app so far (Vikunja, Homarr, MinIO) for the two recurring
+gotcha classes hit this round: leftover local/pre-existing accounts not
+linked to the SSO identity, and OIDC group claims not matching the
+target app's expected group/policy/role name.
