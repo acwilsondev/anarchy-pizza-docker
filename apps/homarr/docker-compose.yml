@@ -11,8 +11,9 @@ services:
       # callback origin instead of the real domain.
       - BASE_URL=https://homarr.${DOMAIN}
       - NEXTAUTH_URL=https://homarr.${DOMAIN}
-      # credentials kept alongside oidc as a fallback login path.
-      - AUTH_PROVIDERS=oidc,credentials
+      # Authelia OIDC only - no local credentials login.
+      - AUTH_PROVIDERS=oidc
+      - AUTH_OIDC_AUTO_LOGIN=true
       - AUTH_OIDC_ISSUER=${AUTH_OIDC_ISSUER}
       - AUTH_OIDC_CLIENT_ID=${AUTH_OIDC_CLIENT_ID}
       - AUTH_OIDC_CLIENT_SECRET=${AUTH_OIDC_CLIENT_SECRET}
