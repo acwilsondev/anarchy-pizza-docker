@@ -278,6 +278,47 @@ any future OIDC rollout (Minio/Vaultwarden)** if those apps have
 pre-existing local accounts with a different email than what
 LDAP/Authelia presents.
 
+## Homarr (added 2026-08-05)
+
+New app - wasn't in the repo or running before this, unlike everything
+else migrated so far. `apps/homarr`, `ghcr.io/homarr-labs/homarr:latest`,
+data at `${STORAGE_ROOT}/bronze/homarr`, `docker.sock` mounted read-only
+for its Docker integration widgets. Second Tier 2 (real OIDC) app, same
+pattern as Vikunja - registered as a client in `identity_providers.yml`,
+Traefik labels with no forward-auth middleware.
+
+Applied lessons from Vikunja up front rather than re-learning them:
+- **`BASE_URL` and `NEXTAUTH_URL` both set to `https://homarr.anarchy.pizza`**
+  - Homarr is Next.js/NextAuth-based and without these it generates
+  `localhost` as the OIDC callback origin (a known upstream issue).
+- **`AUTH_OIDC_FORCE_USERINFO=true`** - called out specifically in
+  Authelia's own Homarr integration notes: without it, Homarr "does not
+  honor the expected process to retrieve the claims it needs."
+- **`token_endpoint_auth_method: 'client_secret_basic'`** used per
+  Authelia's Homarr-specific doc example (not the generic default) -
+  this is exactly the setting that was wrong for Vikunja
+  (`client_secret_post` there), so used the client-specific
+  recommendation this time instead of assuming one setting fits all
+  OIDC clients.
+- **No pre-existing local Homarr account to worry about** - it's a brand
+  new app, so the account-linking/email-mismatch problem that bit
+  Vikunja structurally can't happen here; didn't need
+  `AUTH_OIDC_ENABLE_DANGEROUS_CREDENTIALS_LINKING` (Homarr's equivalent
+  of Vikunja's `emailfallback`, named "dangerous" by Homarr's own devs)
+  at all.
+- Scopes include `groups` (Vikunja's didn't need this) - Homarr maps
+  OIDC groups to local Homarr groups for permissions; not configured
+  further than the default `everyone` group here.
+
+**Verification, and an honest caveat:** discovery document and Traefik
+routing confirmed; hitting Authelia's authorization endpoint with a real
+Aaron session cookie returns the same `302` to Authelia's consent page
+that Vikunja's did - which, per the lesson above, only proves
+`client_id`/`redirect_uri`/`scope` are structurally valid, **not** that
+the token exchange past consent actually works. Didn't repeat the
+Vikunja mistake of calling that "verified" - it isn't, until Aaron
+actually logs in.
+
 ## Status as of 2026-08-05
 
 **Live behind Traefik + Authelia, LDAP-backed, role-restricted:**
@@ -346,6 +387,12 @@ LDAP/Authelia presents.
   middleware (OIDC apps talk to Authelia directly). Local login left
   enabled alongside OIDC rather than forcing OIDC-only, so there's a
   fallback if the OIDC config ever breaks.
+- `homarr.anarchy.pizza` — Homarr (`apps/homarr`), new app, not
+  previously in the repo. Second Tier 2/OIDC app - see "Homarr" above for
+  the full setup and the Vikunja lessons applied up front. **Not yet
+  confirmed working end-to-end** - discovery/routing/client-registration
+  checks pass, but per the Vikunja experience that doesn't guarantee the
+  token exchange does; Aaron's actual login is still the real test.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -453,6 +500,10 @@ add a second, redundant gate in front of their own login.
   forced OIDC-only (a deliberate fallback choice, easy to revisit — set
   `VIKUNJA_AUTH_LOCAL_ENABLED=false` and drop local accounts if the OIDC
   path proves solid over time).
+- **Homarr** — new app (wasn't running before), added directly with OIDC
+  from the start rather than migrating existing local accounts, so none
+  of Vikunja's account-linking issues apply. Pending Aaron's real login
+  to confirm the token exchange actually works — see "Homarr" above.
 - **Minio** (Console only) — OIDC via `AssumeRoleWithWebIdentity`. Do
   **not** put the S3 API endpoint behind Authelia/OIDC — scripts/rclone/etc.
   use access keys, not browser auth, and would break.

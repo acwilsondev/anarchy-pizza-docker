@@ -1,0 +1,44 @@
+services:
+
+  homarr:
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY}
+      # Required for OIDC - otherwise Homarr sends localhost as the
+      # callback origin instead of the real domain.
+      - BASE_URL=https://homarr.${DOMAIN}
+      - NEXTAUTH_URL=https://homarr.${DOMAIN}
+      # credentials kept alongside oidc as a fallback login path.
+      - AUTH_PROVIDERS=oidc,credentials
+      - AUTH_OIDC_ISSUER=${AUTH_OIDC_ISSUER}
+      - AUTH_OIDC_CLIENT_ID=${AUTH_OIDC_CLIENT_ID}
+      - AUTH_OIDC_CLIENT_SECRET=${AUTH_OIDC_CLIENT_SECRET}
+      - AUTH_OIDC_CLIENT_NAME=Authelia
+      - AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups
+      - AUTH_OIDC_GROUPS_ATTRIBUTE=groups
+      # Authelia-specific: without this Homarr doesn't retrieve claims
+      # correctly (per Authelia's own Homarr integration notes).
+      - AUTH_OIDC_FORCE_USERINFO=true
+      - AUTH_LOGOUT_REDIRECT_URL=https://auth.${DOMAIN}/logout
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${STORAGE_ROOT}/bronze/homarr:/appdata
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.homarr.rule=Host(`homarr.${DOMAIN}`)
+      - traefik.http.routers.homarr.entrypoints=web
+      - traefik.http.services.homarr.loadbalancer.server.port=7575
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true
