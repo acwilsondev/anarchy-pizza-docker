@@ -878,6 +878,20 @@ add a second, redundant gate in front of their own login.
   none (checked its GitHub repo, issues, and docs directly — no
   header-auth, no OIDC).
 
+## Stray finding: Vaultwarden healthcheck (fixed 2026-08-05)
+
+Unrelated to the SSO rollout, found during a post-migration audit -
+Vaultwarden showed `unhealthy` in `docker ps` despite working fine
+(`vault.anarchy.pizza` returned `200`). Cause: `apps/vaultwarden`'s
+healthcheck hit `http://localhost:80/health`, which 404'd; the actual
+endpoint on the current image (`vaultwarden/server:latest`, a floating
+tag) is `/alive`. The endpoint apparently moved upstream at some point
+and the healthcheck definition was never updated to match. Fixed by
+changing the healthcheck path; confirmed `healthy` afterward. Also
+caught along the way: redeploying without Vaultwarden's own local `.env`
+(only the root one) silently drops `VAULTWARDEN_DOMAIN` - both
+`--env-file` flags matter, same as every other app in this repo.
+
 ## Suggested next step
 
 **S3-compatible storage is an open decision, not started.** RustFS was

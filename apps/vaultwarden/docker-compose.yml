@@ -11,7 +11,7 @@ services:
     volumes:
       - ${STORAGE_ROOT}/gold/vault:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/alive"]
       interval: 1m
       timeout: 10s
       retries: 3
