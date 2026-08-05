@@ -319,6 +319,39 @@ the token exchange past consent actually works. Didn't repeat the
 Vikunja mistake of calling that "verified" - it isn't, until Aaron
 actually logs in.
 
+**Login worked, but with a new twist on the Vikunja account-linking
+issue:** the `/init` onboarding wizard creates a local-credentials admin
+account (in a seeded `credentials-admin` group) independently of OIDC
+being configured at all - so even with `AUTH_PROVIDERS=oidc` only and
+zero pre-existing "real" local accounts, the very act of completing
+first-run setup created one. The subsequent OIDC login then created a
+**second**, separate account (matched by `provider=oidc`, Homarr doesn't
+auto-link to the credentials account by default) landing only in the
+default `everyone` group - no admin rights. Homarr does ship a
+group-sync mechanism (`AUTH_OIDC_GROUPS_ATTRIBUTE=groups` maps OIDC
+`groups` claims to same-named local Homarr groups) and had a pre-seeded
+`admin` group ready for exactly this - but LLDAP's group is named
+`admins` (plural, matching every other app's convention in this repo),
+so the name never matched and auto-sync silently did nothing.
+
+Fixed directly in Homarr's sqlite DB
+(`${STORAGE_ROOT}/bronze/homarr/db/db.sqlite`, `better-sqlite3`) after
+confirming zero real data was tied to the orphaned account (board
+`creator_id` was `NULL` - system-seeded, not personally owned): added
+the OIDC account to the `admin`-permission group, renamed that group to
+`admins` to match LLDAP going forward, and removed the now-permanently-
+unusable local credentials account (local login is disabled, so it could
+never be logged into again) along with its now-empty `credentials-admin`
+group. **Gotcha inside the fix:** first attempt at the DB write silently
+did nothing - forgot `docker run -i` (stdin attachment) with the sqlite3
+container, so the heredoc SQL never reached the process at all, no error,
+no effect. Container access needs `-i` when piping SQL via stdin.
+
+**Worth checking for any future OIDC app with an unattended/init-wizard
+first-run flow** (anything that seeds a local admin account on first
+boot, independent of the auth-provider config) - the same
+account-fragmentation pattern could recur.
+
 ## Status as of 2026-08-05
 
 **Live behind Traefik + Authelia, LDAP-backed, role-restricted:**
@@ -388,11 +421,13 @@ actually logs in.
   enabled alongside OIDC rather than forcing OIDC-only, so there's a
   fallback if the OIDC config ever breaks.
 - `homarr.anarchy.pizza` — Homarr (`apps/homarr`), new app, not
-  previously in the repo. Second Tier 2/OIDC app - see "Homarr" above for
-  the full setup and the Vikunja lessons applied up front. **Not yet
-  confirmed working end-to-end** - discovery/routing/client-registration
-  checks pass, but per the Vikunja experience that doesn't guarantee the
-  token exchange does; Aaron's actual login is still the real test.
+  previously in the repo. Second Tier 2/OIDC app, **fully working**,
+  confirmed by Aaron logging in for real. Local credentials login
+  subsequently disabled (`AUTH_PROVIDERS=oidc` only, `AUTH_OIDC_AUTO_LOGIN=true`
+  so the single remaining method skips a pointless chooser screen) - see
+  "Homarr" above for the full setup, the Vikunja lessons applied up
+  front, and the admin-group account-fragmentation issue hit and fixed
+  after switching to OIDC-only.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
