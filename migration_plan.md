@@ -959,8 +959,58 @@ working the same way as the other 8.
 
 **Status: Phase 1 (prep) now genuinely complete and validated**, unlike
 the first attempt. Phase 2 (isolated validation) effectively happened as
-part of fixing Phase 1. Phase 3 (the actual cutover - stop NPM, publish
-80/443 on Traefik) has **not** been attempted yet.
+part of fixing Phase 1.
+
+## Phase 3: the actual cutover - executed, successful (2026-08-05)
+
+Given the earlier incident, this specific command (`docker compose down`
+NPM immediately followed by bringing Traefik up with `80:80`/`443:443`
+published) was called out explicitly to Aaron and run only after his
+explicit authorization - Claude Code's own auto-mode classifier also
+independently flagged it as needing confirmation before running, which
+was the right call given the day's history.
+
+**Sequence:** stopped NPM (`docker compose down` - removes the
+container, not just stops it, but its compose file and
+`${STORAGE_ROOT}/silver/nginx-proxy-manager` data are completely
+untouched, so `docker compose up -d` in `apps/npm` would restore it
+instantly if ever needed), immediately followed by redeploying Traefik
+with the public ports live.
+
+**What actually happened, in order:**
+1. Traefik came up and bound `0.0.0.0:80`/`0.0.0.0:443` correctly.
+2. Plain HTTP worked immediately - `curl http://dozzle.anarchy.pizza`
+   returned a clean `301` to `https://`, confirming the redirect
+   entrypoint config was correct.
+3. Traefik began ACME HTTP-01 validation for all 9 domains. Each took
+   roughly 20-30 seconds end to end (trying → server validates → server
+   issues cert) - **longer than the "few seconds" estimated in the
+   original plan**, and largely sequential rather than fully parallel.
+4. During that ~30-60 second window, HTTPS requests to any
+   not-yet-issued domain hung/timed out rather than erroring cleanly -
+   the TLS handshake itself blocks waiting for a cert, so a first
+   verification sweep run too early showed `000` (connection
+   timeout) across the board, which briefly looked like a repeat of the
+   earlier incident. It wasn't - HTTP already worked, and re-running the
+   same sweep about a minute later showed all 9 certs had landed
+   successfully (`Server responded with a certificate` in Traefik's
+   logs for every domain).
+5. Final verification: all 9 domains return their expected response
+   code over real HTTPS (not `-k`/insecure), and the certificate itself
+   was confirmed genuine - `issuer: C=US; O=Let's Encrypt; CN=YR2`,
+   `SSL certificate verify ok`, not Traefik's self-signed fallback.
+
+**Real first-cutover HTTPS downtime window: roughly 30-60 seconds**,
+concentrated in the on-demand ACME issuance for whichever domains hadn't
+gotten their cert yet - noticeably longer than HTTP-01's "few seconds"
+estimate in the original plan, worth knowing for next time. HTTP was
+never down at all past the moment NPM stopped and Traefik started
+listening.
+
+**NPM is now fully offline.** Traefik owns the public edge directly -
+this is the actual state of the stack now, not a future plan. NPM's
+compose file and data are being kept as-is for a rollback window before
+considering `git mv apps/npm archived/npm` (Phase 4, not yet done).
 
 ## Suggested next step
 

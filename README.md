@@ -7,7 +7,7 @@ This repository is a curated collection of Docker Compose configurations for var
 - **Standardized Structure**: Each app lives in its own directory with its own `docker-compose.yml`.
 - **Portable Storage**: All host paths are externalized via variables (`STORAGE_ROOT`, `MEDIA_ROOT`).
 - **Zero-Downtime Updates**: A custom script updates containers only when new images or config changes are detected.
-- **Chained Reverse Proxy**: Nginx Proxy Manager terminates public TLS; Traefik routes internally by Docker labels behind it. No new NPM host is required for internal routing changes.
+- **Direct Reverse Proxy**: Traefik owns the public edge directly — Docker-label routing plus automatic Let's Encrypt TLS, no separate proxy-manager UI in the loop.
 - **Single Sign-On**: [Authelia](https://www.authelia.com/) gates every app that supports it, backed by [LLDAP](https://github.com/lldap/lldap) as the LDAP identity source — one login, one set of credentials, real group-based roles (`admins` / `users`).
 - **Centralized Logging**: Includes **Dozzle** for a unified web-based view of all container logs (behind SSO, not on a public port).
 - **Hardened Configs**: Resource limits, healthchecks, and no unnecessary direct host ports on anything that's routed through the proxy chain.
@@ -60,24 +60,20 @@ docker compose --env-file ../../.env --env-file .env up -d
 bash update-all-apps.sh
 ```
 
-### 5. Wire up the proxy chain (manual, per app — not automated by design)
-For any app carrying `traefik.enable=true` labels, Docker alone doesn't make it reachable from outside — Nginx Proxy Manager still needs a proxy host pointed at Traefik, not the app directly:
-1. In the NPM UI (`http://your-server-ip:81`), create or edit the proxy host for that subdomain.
-2. Forward Hostname/IP: `traefik`. Forward Port: `8080`.
-3. SSL tab → request a new Let's Encrypt certificate → enable **Force SSL**. Don't skip this — Authelia refuses to issue session cookies over plain HTTP, and some apps' frontends hardcode HTTPS API URLs, so a missing Force SSL redirect shows up as confusing CORS/login errors, not an obvious TLS error.
+### 5. Point DNS at your server
+Every subdomain used by a Traefik-labeled app (`dozzle.${DOMAIN}`, `auth.${DOMAIN}`, etc) needs an A/AAAA record pointing at your server's public IP. Traefik handles TLS itself now (Let's Encrypt, HTTP-01) — no manual proxy-host setup needed per app, unlike earlier versions of this stack that chained through Nginx Proxy Manager. A new app just needs `traefik.enable=true` labels and correct DNS; the certificate is issued automatically on first request.
 
-See `migration_plan.md` for the full checklist this pattern is drawn from, plus every gotcha hit setting it up.
+See `migration_plan.md` for the full history of how this pattern evolved, every gotcha hit along the way, and the NPM→Traefik cutover itself (including a live incident worth reading before touching a shared router's TLS config).
 
 ## 🏗️ Architecture Overview
 
 ### Request path
 ```
-Internet → Nginx Proxy Manager (public TLS, ports 80/443/81)
-              → Traefik (internal only, no host ports, routes by Docker label)
-                  → Authelia (forward-auth or OIDC, as needed)
-                      → the app
+Internet → Traefik (public TLS via Let's Encrypt, ports 80/443)
+              → Authelia (forward-auth or OIDC, as needed)
+                  → the app
 ```
-NPM is the only component with public host ports. Traefik and every app behind it are reachable only over the internal `anarchy-pizza` Docker network — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice).
+Traefik owns the public edge directly and terminates TLS itself (Let's Encrypt, HTTP-01). Nginx Proxy Manager, which used to sit in front of Traefik doing this job, has been fully retired — its compose file and data are kept on disk as an instant rollback path (`docker compose up -d` in `apps/npm`), but it is not running. Every app is reachable only over the internal `anarchy-pizza` Docker network otherwise — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice, more than once).
 
 ### Single sign-on: three patterns, by what the app supports
 Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never exposed publicly) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
@@ -90,7 +86,7 @@ Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never
 
 Access is role-based via two LDAP groups — `admins` (full access) and `users` (deny-listed from a few apps) — not per-app allow-lists.
 
-Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, not yet wired up), **NPM/Traefik themselves** (they *are* the proxy layer), and **LLDAP** (internal-only by design, see above).
+Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, not yet wired up — it is on Traefik/TLS now, just not behind Authelia), and **LLDAP** (internal-only by design, see above).
 
 ### Storage tiers
 - `gold/`: Fast storage (SSD/NVMe) for databases and high-IO apps.
@@ -116,9 +112,10 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 | Homarr | `homarr.${DOMAIN}` | Native OIDC |
 | Vaultwarden | `vault.${DOMAIN}` | None yet (candidate) |
 | LLDAP | internal-only (Tailscale) | — (identity backend) |
-| NPM / Traefik | — | — (the proxy chain itself) |
+| Traefik | — | — (the proxy layer itself; owns public TLS directly) |
 
 **Archived** (`archived/`) — retired or replaced, compose files kept for reference, data intentionally left on disk rather than deleted:
+- **Nginx Proxy Manager (NPM)** → fully retired once Traefik took over public TLS/routing directly. Kept as an instant rollback path (`docker compose up -d` in `apps/npm`), not deleted.
 - **Portainer** — decommissioned by choice, not part of the active stack.
 - **CommaFeed** → replaced by FreshRSS (no viable SSO path existed for CommaFeed).
 - **MinIO** → its open-source Console SSO was removed upstream by the vendor (and the project's GitHub repo was later archived entirely); no direct replacement currently running.

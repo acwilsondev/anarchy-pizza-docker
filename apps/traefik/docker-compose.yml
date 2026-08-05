@@ -12,9 +12,8 @@ services:
       # is actually dropped (see migration_plan.md's NPM cutover plan).
       - --entrypoints.web.address=:8080
       - --entrypoints.web.forwardedHeaders.trustedIPs=172.25.0.0/16
-      # New public entrypoints for the NPM cutover - not yet published to
-      # the host (see ports: below), added here ahead of time so config
-      # can be validated before anything goes live.
+      # Public entrypoints - Traefik owns 80/443 directly now, NPM is
+      # dropped (see migration_plan.md's NPM cutover plan).
       - --entrypoints.webinsecure.address=:80
       - --entrypoints.webinsecure.http.redirections.entrypoint.to=websecure
       - --entrypoints.webinsecure.http.redirections.entrypoint.scheme=https
@@ -28,6 +27,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${STORAGE_ROOT}/silver/traefik/acme.json:/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
     deploy:
       resources:
         limits:
