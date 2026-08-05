@@ -198,6 +198,27 @@ account, not meant to represent a real person.
   got a `200`, title `Calibre-Web | Books`, zero password fields on the
   page, `aaron`/`Logout` present in the body — landed straight in the
   library, not a login form.
+- `llm.anarchy.pizza` — Open WebUI (`apps/webui`). **This app wasn't in
+  the repo at all before this** — it had been deployed by hand at some
+  point (image `ghcr.io/open-webui/open-webui:ollama`, GPU passthrough,
+  bundled Ollama, data at `${STORAGE_ROOT}/silver/open-webui` and
+  `${STORAGE_ROOT}/bronze/ollama`) and its compose directory was gone from
+  disk with nothing ever committed to git. Reconstructed from the running
+  container's actual config (`docker inspect`, diffed against the image's
+  own baked-in env to isolate what was actually deploy-specific — turned
+  out to be nothing beyond volumes/network/GPU). Best SSO fit of all four
+  apps so far: native `WEBUI_AUTH_TRUSTED_EMAIL_HEADER` support that
+  **auto-registers or logs in by email match**, no pre-existing account
+  needed (unlike FreshRSS/Calibre-web's username-match requirement). Set
+  to `Remote-Email` (+ `WEBUI_AUTH_TRUSTED_NAME_HEADER=Remote-Name`).
+  Already had no host port published, so it was clean on the port-leak
+  issue below from the start. Verified via the actual signin endpoint
+  (`POST /api/v1/auths/signin` through Traefik with a real Authelia
+  session cookie) rather than just the static shell, since it's a JS SPA
+  and a plain `curl` of `/` can't show auth state — got back a real JWT
+  `token` cookie and a body matching Aaron's **existing** account
+  (`acwilsoncs@gmail.com`, role `admin`, same avatar), not a fresh
+  auto-provisioned one.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -221,6 +242,11 @@ account, not meant to represent a real person.
   live (`302` redirect to Authelia instead of the earlier `502`).
 - ~~`library.anarchy.pizza`'s NPM proxy host repoint~~ — resolved, Aaron
   updated it, confirmed live end-to-end (see Calibre-web entry above).
+- `llm.anarchy.pizza`'s NPM proxy host still points its Forward
+  Hostname/IP at `open-webui:8080` directly. **Manual step needed:** in
+  the NPM UI, edit that host → change Forward Hostname/IP to `traefik`,
+  Forward Port to `8080` (SSL already configured on that host, no cert
+  changes needed).
 
 ## Security finding: leftover direct host ports bypassed Authelia entirely (fixed 2026-08-05)
 
@@ -271,6 +297,11 @@ portal, then the app's own separate login right after)?
   directly — logging into Authelia logs you into the app itself, no
   second login. Same underlying mechanism as Tier 3 below (Calibre-web),
   just supported natively instead of via a bolt-on option.
+- **Open WebUI** — done. Best of this batch: `WEBUI_AUTH_TRUSTED_EMAIL_HEADER`
+  matches by email and auto-registers if no account exists, so there's no
+  pre-provisioning step at all (unlike FreshRSS/Calibre-web's
+  username-must-already-exist requirement). Also wasn't in the repo to
+  begin with — see Status above for the reconstruction story.
 
 ### Tier 2 — has native OIDC support, real one-login SSO possible
 These need Authelia configured as an actual **OIDC provider** (not just

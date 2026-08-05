@@ -1,0 +1,34 @@
+services:
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:ollama
+    container_name: open-webui
+    restart: unless-stopped
+    environment:
+      # Trusts Authelia's forward-auth headers - auto-registers/logs in on
+      # email match, no pre-existing account needed (unlike Calibre-web).
+      - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=Remote-Email
+      - WEBUI_AUTH_TRUSTED_NAME_HEADER=Remote-Name
+    volumes:
+      - ${STORAGE_ROOT}/bronze/ollama:/root/.ollama
+      - ${STORAGE_ROOT}/silver/open-webui:/app/backend/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.openwebui.rule=Host(`llm.${DOMAIN}`)
+      - traefik.http.routers.openwebui.entrypoints=web
+      - traefik.http.routers.openwebui.middlewares=authelia@docker
+      - traefik.http.services.openwebui.loadbalancer.server.port=8080
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true
