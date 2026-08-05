@@ -242,8 +242,17 @@ Aaron session cookie returns a `302` to Authelia's consent page rather
 than an error - confirms `client_id`/`redirect_uri`/`scope` all validate
 against the registered client. Didn't script past the consent screen
 itself (it's a JS-driven flow, not worth reverse-engineering via curl) -
-that last click-through is left to Aaron, same as the OPML import was for
-FreshRSS.
+turned out that gap mattered: the actual token exchange (past consent)
+failed with `invalid_client` / `"the OAuth 2.0 client registration does
+not allow this method"` - Vikunja's OAuth2 client sends its secret via
+`client_secret_post` (in the POST body), but the client was registered
+with `token_endpoint_auth_method: 'client_secret_basic'` (HTTP Basic
+Auth header instead). **Lesson: the consent redirect only proves the
+authorization request is well-formed, not that the full flow works** -
+token exchange is a separate, later step with its own failure modes.
+Fixed by changing `token_endpoint_auth_method` to `client_secret_post` in
+`identity_providers.yml` and restarting Authelia (which, per the
+no-Redis gotcha above, logged everyone out).
 
 ## Status as of 2026-08-05
 
