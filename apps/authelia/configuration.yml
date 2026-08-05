@@ -16,6 +16,14 @@ authentication_backend:
     base_dn: 'dc=anarchy,dc=pizza'
     user: 'uid=authelia,ou=people,dc=anarchy,dc=pizza'
 
+# identity_providers.oidc lives in identity_providers.yml (host-only,
+# not in git - see apps/authelia/docker-compose.yml's --config flag and
+# migration_plan.md's "Identity backend: LLDAP" / OIDC sections). It's a
+# separate file rather than templated secrets here because it holds a raw
+# RSA private key, which has no _FILE/templating equivalent in this
+# Authelia version that behaved reliably - a second --config file, deep
+# merged, was simpler and more robust.
+
 access_control:
   default_policy: deny
   rules:

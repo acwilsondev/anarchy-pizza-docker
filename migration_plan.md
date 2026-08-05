@@ -162,6 +162,78 @@ create. Fixed by giving the break-glass admin a distinct internal address
 (`admin@anarchy.pizza`) — it's a separate identity from any personal
 account, not meant to represent a real person.
 
+## Authelia as an OIDC provider (added 2026-08-05)
+
+Tier 2 apps (Vikunja, eventually Minio/Vaultwarden) need Authelia
+configured as an actual **OIDC provider**, not just forward-auth - a
+bigger, one-time step under `identity_providers.oidc`.
+
+**Two new secrets, neither with a reliable simple fix:**
+- `hmac_secret` - random 64+ char string.
+- `jwks` - an RSA private key (generated 4096-bit here; 2048 is the
+  documented minimum), PEM format, needed to sign issued JWTs.
+
+**How the secrets are kept out of git - and what didn't work first:**
+Authelia's docs show a `{{ secret "/path" }}` templating mechanism for
+exactly this (`AUTHELIA_CONFIGURATION_FILTERS=template` env var), with a
+`mindent`/`msquote` filter combo specifically for multi-line PEM content.
+Tried it first since it's the documented approach - it didn't work on
+this Authelia version (`v4.39.20`): `AUTHELIA_CONFIGURATION_FILTERS` came
+back as "not expected", meaning the filter was never actually active, so
+the raw `{{ ... }}` template syntax got parsed literally as YAML and
+failed (`invalid map key`), cascading into a wall of unrelated "required"
+errors that made the real problem non-obvious at first glance.
+
+Abandoned templating for something simpler and more robust: Authelia's
+`--config` flag accepts multiple comma-separated files that get deep
+merged (`authelia --config /a.yml,/b.yml`). Split `identity_providers.oidc`
+(hmac_secret, jwks key, and the Vikunja client registration) into a
+second file, `identity_providers.yml`, living host-only at
+`${STORAGE_ROOT}/silver/authelia/` - same treatment the old
+`users_database.yml` got, never in git. `apps/authelia/docker-compose.yml`
+now sets `command: [--config, /config/configuration.yml,/config/identity_providers.yml]`
+to load both.
+
+**Gotcha inside that fix:** the command has to be the *space-separated*
+form (`--config`, then the value, as two separate list items), not
+`--config=value`. The image's `entrypoint.sh` special-cases a first
+argument of exactly `--config` to prepend the `authelia` binary correctly;
+anything else (including `--config=...` as one token) falls through to a
+branch that tries to `exec` the literal string as a program name -
+`illegal option --` was the resulting error, several layers removed from
+the actual cause.
+
+**Vikunja-side gotcha avoided:** Vikunja's OpenID config used to require
+at least a minimal `config.yml` stub declaring the provider key before
+env vars would be read for it - fixed upstream in Vikunja as of January
+2025. The image in use here (`vikunja/vikunja:latest`) postdates that
+fix, so the whole client config is env-var-only
+(`VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_*` in `apps/vikunja/.env`), no
+config file needed.
+
+**Client secret handling:** Authelia stores only a PBKDF2 hash of
+Vikunja's client secret (`authelia crypto hash generate pbkdf2 --password
+'...'`) - safe to commit in principle (one-way hash, this is literally
+what Authelia's own docs show inline), but kept in the host-only
+`identity_providers.yml` anyway for consistency with everything else in
+this section. Vikunja gets the plaintext via its own `.env`.
+
+**No forward-auth middleware on Vikunja's Traefik labels** - unlike every
+Tier 1/1b/3 app, Vikunja talks to Authelia directly via OAuth redirects,
+so stacking `authelia@docker` forward-auth on top would just add a
+redundant, conflicting second gate.
+
+**Verification:** OIDC discovery document (`/.well-known/openid-configuration`)
+returns the expected issuer/endpoints; Vikunja's own `/api/v1/info`
+correctly lists the `authelia` provider with the right `auth_url` and
+`client_id`; hitting Authelia's real authorization endpoint with a valid
+Aaron session cookie returns a `302` to Authelia's consent page rather
+than an error - confirms `client_id`/`redirect_uri`/`scope` all validate
+against the registered client. Didn't script past the consent screen
+itself (it's a JS-driven flow, not worth reverse-engineering via curl) -
+that last click-through is left to Aaron, same as the OPML import was for
+FreshRSS.
+
 ## Status as of 2026-08-05
 
 **Live behind Traefik + Authelia, LDAP-backed, role-restricted:**
@@ -219,6 +291,15 @@ account, not meant to represent a real person.
   `token` cookie and a body matching Aaron's **existing** account
   (`acwilsoncs@gmail.com`, role `admin`, same avatar), not a fresh
   auto-provisioned one.
+- `vikunja.anarchy.pizza` — Vikunja (`apps/vikunja`). First Tier 2 app:
+  real OIDC, not forward-auth - see "Authelia as an OIDC provider" above
+  for the full setup and the two gotchas hit along the way. Traefik labels
+  added with **no** `authelia@docker` middleware (OIDC apps talk to
+  Authelia directly). Local login left enabled alongside OIDC rather than
+  forcing OIDC-only, so there's a fallback if the OIDC config ever breaks.
+  Verified through discovery document + provider registration + a real
+  authorization request returning Authelia's consent redirect; the actual
+  consent click-through is manual (see above).
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -247,6 +328,10 @@ account, not meant to represent a real person.
   the NPM UI, edit that host → change Forward Hostname/IP to `traefik`,
   Forward Port to `8080` (SSL already configured on that host, no cert
   changes needed).
+- `vikunja.anarchy.pizza`'s NPM proxy host still points its Forward
+  Hostname/IP at `vikunja:3456` directly. **Manual step needed:** same
+  repoint as above, plus completing the one-time OIDC consent
+  click-through in a real browser (see "Authelia as an OIDC provider").
 
 ## Security finding: leftover direct host ports bypassed Authelia entirely (fixed 2026-08-05)
 
@@ -305,12 +390,14 @@ portal, then the app's own separate login right after)?
 
 ### Tier 2 — has native OIDC support, real one-login SSO possible
 These need Authelia configured as an actual **OIDC provider** (not just
-forward-auth) — a bigger one-time step (`identity_providers.oidc` block in
-`configuration.yml`, per-app client registration) that hasn't been done
-yet. Forward-auth alone won't give SSO for these; it would just add a
-second, redundant gate in front of their own login.
-- **Vikunja** — solid native OIDC support, can even force OIDC-only login
-  and drop local accounts entirely.
+forward-auth) — a bigger one-time step (`identity_providers.oidc`, now
+live — see "Authelia as an OIDC provider" above), plus per-app client
+registration. Forward-auth alone won't give SSO for these; it would just
+add a second, redundant gate in front of their own login.
+- **Vikunja** — done. Local login left enabled alongside OIDC rather than
+  forced OIDC-only (a deliberate fallback choice, easy to revisit — set
+  `VIKUNJA_AUTH_LOCAL_ENABLED=false` and drop local accounts if the OIDC
+  path proves solid over time).
 - **Minio** (Console only) — OIDC via `AssumeRoleWithWebIdentity`. Do
   **not** put the S3 API endpoint behind Authelia/OIDC — scripts/rclone/etc.
   use access keys, not browser auth, and would break.
@@ -348,10 +435,13 @@ second, redundant gate in front of their own login.
 
 ## Suggested next step
 
-Finish the Calibre-web manual steps (account + header toggle + NPM
-repoint) above, then verify it end-to-end the same way FreshRSS was
-verified (curl through Traefik with a real Authelia session cookie,
-confirm a `200` landing in the app rather than a login form).
-Vikunja/Minio/Vaultwarden OIDC is a separate, bigger effort
-(Authelia-as-IdP setup) worth doing as its own
-session rather than folding into the forward-auth rollout.
+Finish Vikunja's manual consent click-through and NPM repoint (see
+Cleanup TODO above), then Minio and Vaultwarden are what's left —
+Authelia's OIDC provider is already live, so it's "just" per-app client
+registration + app-side config now, the same pattern as Vikunja, not the
+bigger from-scratch OIDC setup this round required. Minio: Console only,
+never the S3 API endpoint (scripts/rclone use access keys, not browser
+auth). Vaultwarden: its OIDC flows through the real Bitwarden-compatible
+clients, not just the web vault — a genuinely different integration
+surface than Vikunja's browser-only login, worth extra care testing an
+actual client app, not just the browser.

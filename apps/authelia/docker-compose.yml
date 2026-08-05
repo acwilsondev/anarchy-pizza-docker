@@ -4,6 +4,12 @@ services:
     image: authelia/authelia:latest
     container_name: authelia
     restart: unless-stopped
+    # identity_providers.yml holds the OIDC HMAC secret/RSA key/client
+    # registrations - host-only (${STORAGE_ROOT}/silver/authelia/), not in
+    # git, deep-merged on top of the tracked configuration.yml.
+    command:
+      - --config
+      - /config/configuration.yml,/config/identity_providers.yml
     environment:
       - TZ=${TZ}
       - AUTHELIA_SESSION_SECRET_FILE=/config/secrets/session_secret
