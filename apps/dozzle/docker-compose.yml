@@ -8,6 +8,12 @@ services:
     ports:
       - 8888:8080
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)
+      - traefik.http.routers.dozzle.entrypoints=web
+      - traefik.http.routers.dozzle.middlewares=authelia@docker
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
     networks:
       - anarchy-pizza
 

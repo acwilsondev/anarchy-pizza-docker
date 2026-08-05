@@ -4,6 +4,12 @@ services:
     restart: unless-stopped
     volumes:
       - ${STORAGE_ROOT}/bronze/uptime-kuma:/app/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.uptimekuma.rule=Host(`uptime.${DOMAIN}`)
+      - traefik.http.routers.uptimekuma.entrypoints=web
+      - traefik.http.routers.uptimekuma.middlewares=authelia@docker
+      - traefik.http.services.uptimekuma.loadbalancer.server.port=3001
     deploy:
       resources:
         limits:
