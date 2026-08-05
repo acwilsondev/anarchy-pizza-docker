@@ -72,6 +72,17 @@ untouched apps.
 
 ## Gotchas hit during this migration (don't re-debug these)
 
+- **Always double-check Force SSL got enabled on a freshly-repointed NPM
+  host**, not just that the cert exists. Every prior app in this rollout
+  happened to get browsed over HTTPS regardless (typed with `https://`,
+  or HSTS remembered from an earlier visit), masking that Force SSL
+  wasn't actually on. Vikunja's SPA frontend calls its API via a
+  hardcoded HTTPS `VIKUNJA_SERVICE_PUBLICURL` regardless of what scheme
+  the page itself loaded under - so the one time a host got visited over
+  plain `http://` first, it broke as a same-hostname-different-origin
+  CORS error, not an obviously-SSL-shaped symptom. Any app whose frontend
+  hardcodes an absolute HTTPS URL for its own API (SPAs are the likely
+  culprits) is exposed to this if Force SSL is missing.
 - **`traefik:v3.1` couldn't talk to the Docker daemon** — host is Docker
   Engine 29.1.3 (API 1.52), and that Traefik version's bundled client
   capped out negotiating at API 1.24. Fixed by bumping to `traefik:latest`
@@ -328,10 +339,18 @@ FreshRSS.
   the NPM UI, edit that host → change Forward Hostname/IP to `traefik`,
   Forward Port to `8080` (SSL already configured on that host, no cert
   changes needed).
-- `vikunja.anarchy.pizza`'s NPM proxy host still points its Forward
-  Hostname/IP at `vikunja:3456` directly. **Manual step needed:** same
-  repoint as above, plus completing the one-time OIDC consent
-  click-through in a real browser (see "Authelia as an OIDC provider").
+- ~~`vikunja.anarchy.pizza`'s NPM proxy host repoint~~ — resolved, Aaron
+  updated it to `traefik:8080`. Hit a new bug doing so: **Force SSL was
+  never enabled on this host** (unlike e.g. `vault.anarchy.pizza`, which
+  has the `include conf.d/include/force-ssl.conf` block — Vikunja's
+  `24.conf` didn't). Plain `http://` requests passed straight through
+  instead of redirecting to `https://`. Since Vikunja's frontend always
+  calls its API via the hardcoded HTTPS `VIKUNJA_SERVICE_PUBLICURL`,
+  loading the page over HTTP created a same-hostname-different-origin
+  mismatch, which the browser correctly blocked as CORS ("Login with
+  Authelia" just spun, no request ever left the page). Fixed by enabling
+  Force SSL on the host in the NPM UI. The one-time OIDC consent
+  click-through in a real browser is still pending.
 
 ## Security finding: leftover direct host ports bypassed Authelia entirely (fixed 2026-08-05)
 
