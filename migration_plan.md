@@ -254,6 +254,30 @@ Fixed by changing `token_endpoint_auth_method` to `client_secret_post` in
 `identity_providers.yml` and restarting Authelia (which, per the
 no-Redis gotcha above, logged everyone out).
 
+**Account linking gotcha:** once the token exchange worked, the first
+real OIDC login **created a brand new Vikunja account**
+(`seemingly-large-skylark`) instead of using Aaron's existing local
+`aaron` account, which had real project/task data. Root cause was two
+separate things stacked together: (1) Vikunja never auto-links an OIDC
+login to a local account unless `emailfallback` and/or `usernamefallback`
+are explicitly enabled - neither was set, so it defaulted to "always
+create new"; (2) even with fallback enabled, the local account's email
+(`aaronw@ikmail.com`) didn't match the email Authelia/LLDAP actually
+sends (`acwilsoncs@gmail.com`), so email matching would've missed it
+anyway. Fixed by updating the local account's email to match (direct SQL
+- Vikunja's own change-email flow requires a confirmation email, and the
+mailer here is disabled, so it would've gotten stuck pending forever),
+deleting the empty auto-created account and its default "Inbox" project
+(confirmed zero real data first - `SELECT count(*) FROM tasks ...`),
+and adding `VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_EMAILFALLBACK=true`.
+Deliberately did **not** enable `usernamefallback` - Vikunja's own docs
+flag it as letting the provider claim any local account by username, a
+real hijacking risk; `emailfallback` alone is sufficient once the emails
+actually match. **Worth checking this same email-mismatch risk before
+any future OIDC rollout (Minio/Vaultwarden)** if those apps have
+pre-existing local accounts with a different email than what
+LDAP/Authelia presents.
+
 ## Status as of 2026-08-05
 
 **Live behind Traefik + Authelia, LDAP-backed, role-restricted:**
@@ -311,15 +335,17 @@ no-Redis gotcha above, logged everyone out).
   `token` cookie and a body matching Aaron's **existing** account
   (`acwilsoncs@gmail.com`, role `admin`, same avatar), not a fresh
   auto-provisioned one.
-- `vikunja.anarchy.pizza` — Vikunja (`apps/vikunja`). First Tier 2 app:
+- `vikunja.anarchy.pizza` — Vikunja (`apps/vikunja`). **Fully working
+  end-to-end**, confirmed by Aaron logging in for real. First Tier 2 app:
   real OIDC, not forward-auth - see "Authelia as an OIDC provider" above
-  for the full setup and the two gotchas hit along the way. Traefik labels
-  added with **no** `authelia@docker` middleware (OIDC apps talk to
-  Authelia directly). Local login left enabled alongside OIDC rather than
-  forcing OIDC-only, so there's a fallback if the OIDC config ever breaks.
-  Verified through discovery document + provider registration + a real
-  authorization request returning Authelia's consent redirect; the actual
-  consent click-through is manual (see above).
+  for the full setup and the four gotchas hit along the way (templating
+  didn't work, `--config` needs the space-separated form, Force SSL
+  wasn't on, and the token-exchange auth method mismatch that also
+  created a duplicate account before `emailfallback` + a matching email
+  fixed it). Traefik labels added with **no** `authelia@docker`
+  middleware (OIDC apps talk to Authelia directly). Local login left
+  enabled alongside OIDC rather than forcing OIDC-only, so there's a
+  fallback if the OIDC config ever breaks.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -358,8 +384,9 @@ no-Redis gotcha above, logged everyone out).
   loading the page over HTTP created a same-hostname-different-origin
   mismatch, which the browser correctly blocked as CORS ("Login with
   Authelia" just spun, no request ever left the page). Fixed by enabling
-  Force SSL on the host in the NPM UI. The one-time OIDC consent
-  click-through in a real browser is still pending.
+  Force SSL on the host in the NPM UI. Full login confirmed working by
+  Aaron end-to-end (see Status above for the account-linking fix that
+  came after).
 
 ## Security finding: leftover direct host ports bypassed Authelia entirely (fixed 2026-08-05)
 
