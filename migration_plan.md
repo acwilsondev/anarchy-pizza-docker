@@ -36,12 +36,21 @@ untouched apps.
    ```
    Add `- traefik.http.routers.<name>.middlewares=authelia@docker` too if
    it's getting Authelia-protected.
-2. If Authelia-protected, add an `access_control` rule for the domain in
+2. **Remove the app's `ports:` block if it has one.** Apps that pre-date
+   the Traefik migration usually still have a host port published from
+   the old direct-NPM-to-container setup - Traefik reaches every app over
+   the internal `anarchy-pizza` network by container name, so once it's
+   Traefik-routed the host port isn't needed and just gives a way to
+   bypass Authelia entirely by hitting `host:<port>` directly. Bit us on
+   Dozzle, Uptime Kuma, and Calibre-web - see "Security finding" below.
+   Confirm with `curl http://localhost:<port>` after redeploying;
+   connection-refused is what you want.
+3. If Authelia-protected, add an `access_control` rule for the domain in
    `apps/authelia/configuration.yml`, then `docker restart authelia`
    (compose won't pick up bind-mounted config changes on its own — the
    container has to be explicitly restarted).
-3. Redeploy the app: `docker compose --env-file ../../.env up -d`.
-4. Sanity-check before touching NPM — exec into NPM and hit Traefik
+4. Redeploy the app: `docker compose --env-file ../../.env up -d`.
+5. Sanity-check before touching NPM — exec into NPM and hit Traefik
    directly with headers that simulate what NPM will send:
    ```
    docker exec npm curl -s -D - -o /dev/null \
@@ -51,14 +60,14 @@ untouched apps.
    ```
    Expect a 302 to `auth.anarchy.pizza` (if Authelia-protected) or a 200
    from the app (if not).
-5. **Manual, in NPM UI** (not git-managed, lives in NPM's sqlite db):
+6. **Manual, in NPM UI** (not git-managed, lives in NPM's sqlite db):
    edit/create the proxy host → Forward Hostname/IP `traefik`, Forward Port
    `8080` → SSL tab → request a new Let's Encrypt cert → enable **Force
    SSL**. Authelia flatly refuses to issue session cookies over plain HTTP,
    so skipping Force SSL here produces a confusing 401 instead of a login
    redirect (this is exactly what happened on Dozzle's first pass — its
    host had never had a cert issued at all).
-6. Verify live from outside: `curl -v https://<sub>.anarchy.pizza` — check
+7. Verify live from outside: `curl -v https://<sub>.anarchy.pizza` — check
    cert CN and the redirect Location header.
 
 ## Gotchas hit during this migration (don't re-debug these)
@@ -179,15 +188,16 @@ account, not meant to represent a real person.
   **only read on first run**; changing them later requires deleting the
   `freshrss` container and `${STORAGE_ROOT}/silver/freshrss/data` volume
   and reinstalling. OPML import left to Aaron via the GUI.
-- `library.anarchy.pizza` — Calibre-web (`apps/calibre-web`). Traefik
-  labels added and container redeployed; header-auth itself is a UI-only
-  setting in Calibre-web with no env var/CLI equivalent (unlike FreshRSS),
-  so two manual steps remain on Aaron's side: (1) confirm/create a
-  Calibre-web account named exactly `aaron`, (2) in Calibre-web's Admin →
-  Edit Basic Configuration → Feature Configuration, check "Allow Reverse
-  Proxy Authentication" and set the header name to `Remote-User`. Plus the
-  usual NPM repoint (see Cleanup TODO). Not yet verified end-to-end like
-  FreshRSS was, since the account/header step is pending.
+- `library.anarchy.pizza` — Calibre-web (`apps/calibre-web`). Real
+  single-login SSO, same as FreshRSS: "Allow Reverse Proxy Authentication"
+  + header name `Remote-User`, set under Admin → **Basic Configuration**
+  (not "UI Configuration" — easy to land on the wrong admin sub-page,
+  which is what happened here at first) → scroll past "Google Books API
+  Key", it's right before the "Login type" dropdown. Verified
+  end-to-end: curled through Traefik with a real Authelia session cookie,
+  got a `200`, title `Calibre-Web | Books`, zero password fields on the
+  page, `aaron`/`Logout` present in the body — landed straight in the
+  library, not a login form.
 - `auth.anarchy.pizza` — Authelia's own portal.
 - LLDAP (`apps/lldap`) — internal-only, bound to this host's Tailscale
   interface; see "Identity backend: LLDAP" above.
@@ -209,12 +219,41 @@ account, not meant to represent a real person.
   `anarchy.pizz` anymore).
 - ~~`news.anarchy.pizza`'s NPM proxy host repoint~~ — resolved, confirmed
   live (`302` redirect to Authelia instead of the earlier `502`).
-- `library.anarchy.pizza`'s NPM proxy host still points its Forward
-  Hostname/IP at `calibre-web:8083` directly. **Manual step needed:** in
-  the NPM UI, edit that host → change Forward Hostname/IP to `traefik`,
-  Forward Port to `8080` (SSL/Force SSL already configured on that host,
-  no cert changes needed) — same repoint as every prior app, plus the
-  Calibre-web account/header steps noted above.
+- ~~`library.anarchy.pizza`'s NPM proxy host repoint~~ — resolved, Aaron
+  updated it, confirmed live end-to-end (see Calibre-web entry above).
+
+## Security finding: leftover direct host ports bypassed Authelia entirely (fixed 2026-08-05)
+
+Discovered while double-checking Calibre-web's header-auth trust model:
+**Dozzle (`:8888`), Uptime Kuma (`:3001`), and Calibre-web (`:8083`) all
+still had their pre-Traefik host ports published**, meaning anyone on the
+LAN could reach them directly and skip Authelia completely:
+- Dozzle has no auth of its own at all — full live container logs, no
+  auth needed, not even header spoofing.
+- Uptime Kuma's own login was deliberately disabled in favor of Authelia
+  being the sole gate — direct port access meant the full dashboard with
+  zero auth.
+- Calibre-web's header-auth trust (`load_user_from_reverse_proxy_header`)
+  does **no IP/proxy validation** — direct access meant anyone could
+  `curl -H "Remote-User: aaron" host:8083` and log in as Aaron with zero
+  credentials.
+
+All three confirmed reachable (`curl http://localhost:<port>` returned
+`200`/`302` with real content, not connection-refused) before the fix.
+Fixed by removing the `ports:` block from all three compose files —
+Traefik reaches every app over the internal `anarchy-pizza` docker
+network by container name, no host port needed once an app is
+Traefik-routed. Re-verified all three: direct port now connection-refused,
+Traefik route still returns the expected `302` to Authelia.
+
+**Root cause:** these three apps all pre-dated the Traefik migration and
+had host ports published for the old direct-NPM-to-container setup. Adding
+Traefik labels doesn't remove the old port publish automatically — that's
+a separate, easy-to-forget step. **Any future app migrated from
+direct-NPM to Traefik should have its `ports:` block explicitly checked
+and removed as part of the migration**, not just have labels added on
+top. Worth adding this as an explicit step in the per-app migration
+checklist above.
 
 ## Candidate apps for Authelia — ranked
 
@@ -252,16 +291,23 @@ second, redundant gate in front of their own login.
   about official clients bypassing browser login.
 
 ### Tier 3 — has header-based reverse-proxy auth support
-- **Calibre-web** — Traefik labels added, container redeployed (see
-  Status above). Unlike FreshRSS, the "Allow Reverse Proxy
+- **Calibre-web** — done. Unlike FreshRSS, the "Allow Reverse Proxy
   Authentication" toggle and header name are UI-only settings (no env
-  var/CLI equivalent), so the account + header config is a manual step
-  left to Aaron. Catch: the username must **already exist** in
-  Calibre-web's own user DB — no auto-provisioning. Also: Calibre-web
-  must not be reachable except through the proxy, or anyone hitting it
-  directly could spoof the header (true of any header-auth app — worth
-  double-checking none of these have a stray direct host port exposed
-  once the NPM repoint is done).
+  var/CLI equivalent) — Admin → **Basic Configuration** (not "UI
+  Configuration"), scroll past "Google Books API Key", right before
+  "Login type". Catch confirmed the hard way: Calibre-web's
+  `load_user_from_reverse_proxy_header()` does **zero IP/proxy
+  validation** — it trusts the header from anywhere, unlike FreshRSS's
+  `TRUSTED_PROXY` check. The compose file still had `ports: 8083:8083`
+  published from before the Traefik migration, which meant anyone on the
+  LAN could `curl -H "Remote-User: aaron" host:8083` and log in as Aaron
+  with zero credentials — a real hole, not a theoretical one. Fixed by
+  removing the port publish entirely; Traefik reaches it over the
+  internal docker network by container name, no host port needed.
+  **Worth auditing every other header-auth app for the same leftover
+  direct-port pattern** — this is exactly the kind of thing that's easy
+  to miss when adding Traefik labels to an app that pre-dates the
+  Traefik migration.
 
 ### Tier 4 — no viable SSO path found
 - ~~**CommaFeed**~~ — resolved by replacing it with FreshRSS (Tier 1b

@@ -11,8 +11,6 @@ services:
     volumes:
       - ${STORAGE_ROOT}/bronze/calibre-web:/config
       - ${MEDIA_ROOT}/books:/books
-    ports:
-      - 8083:8083
     restart: unless-stopped
     labels:
       - traefik.enable=true

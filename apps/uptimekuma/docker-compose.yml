@@ -14,9 +14,6 @@ services:
       resources:
         limits:
           memory: 512M
-    ports:
-      # <Host Port>:<Container Port>
-      - "3001:3001"
     networks:
       - anarchy-pizza
 
