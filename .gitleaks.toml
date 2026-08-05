@@ -1,0 +1,33 @@
+title = "anarchy-pizza-docker gitleaks config"
+
+# Start from gitleaks' maintained default ruleset (AWS keys, GitHub/GitLab
+# tokens, generic high-entropy secrets/passwords, private keys, etc.) and
+# layer repo-specific allowlisting on top, rather than hand-rolling rules.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-secret-with-symbols"
+description = "Generic password/secret/token assignment allowing symbol characters. Complements gitleaks' built-in generic-api-key rule, whose value charset excludes punctuation - so a strong password like `Tr0ub4dor!23` is invisible to it."
+regex = '''(?i)(?:password|passwd|pwd|secret|token|api[_-]?key|private[_-]?key)\s*[:=]\s*["']?([^\s"']{12,100})["']?'''
+secretGroup = 1
+entropy = 3.3
+keywords = [
+  "password", "passwd", "pwd", "secret", "token",
+  "apikey", "api_key", "api-key",
+  "privatekey", "private_key", "private-key",
+]
+
+[allowlist]
+description = "Known-safe placeholder values"
+regexes = [
+  '''changeme''',
+  '''change-me''',
+  '''your[_-][a-zA-Z0-9_-]*''',
+  '''example\.com''',
+]
+# .env.example files are templates with placeholder values only; real
+# secrets live in the gitignored .env files these are copied from.
+paths = [
+  '''(^|/)\.env\.example$''',
+]

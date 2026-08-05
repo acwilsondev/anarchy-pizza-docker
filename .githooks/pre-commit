@@ -1,0 +1,23 @@
+#!/bin/bash
+# Blocks commits containing secrets, using gitleaks against staged changes.
+# Enabled repo-wide via `git config core.hooksPath .githooks` (bootstrap.sh
+# does this automatically). To install gitleaks: `sudo apt install gitleaks`
+# or see https://github.com/gitleaks/gitleaks#installing
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+	echo "pre-commit: gitleaks not found - refusing to commit unscanned." >&2
+	echo "  Install it: sudo apt install gitleaks" >&2
+	echo "  (or see https://github.com/gitleaks/gitleaks#installing)" >&2
+	echo "  To bypass once, use: git commit --no-verify" >&2
+	exit 1
+fi
+
+gitleaks protect \
+	--source "$REPO_ROOT" \
+	--config "$REPO_ROOT/.gitleaks.toml" \
+	--staged \
+	--redact \
+	--verbose

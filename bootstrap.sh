@@ -5,3 +5,9 @@ docker network inspect anarchy-pizza >/dev/null 2>&1 || \
 docker network create anarchy-pizza
 
 echo "Prerequisites checked: 'anarchy-pizza' network is ready."
+
+# Wire up the repo's tracked git hooks (secret-scanning pre-commit, via
+# gitleaks) - core.hooksPath isn't trusted from a clone automatically,
+# so each clone needs to opt in once.
+git config core.hooksPath .githooks
+echo "Git hooks enabled: pre-commit secret scan (requires gitleaks - see README)."
