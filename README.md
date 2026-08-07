@@ -82,7 +82,7 @@ Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never
 |---|---|---|
 | **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma |
 | **Header-auth SSO** | Authelia forwards a trusted header (`Remote-User`/`Remote-Email`); the app trusts it directly — real single login | FreshRSS, Calibre-web, Open WebUI |
-| **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr |
+| **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts - see `apps/matrix/SETUP.md`) |
 
 Access is role-based via two LDAP groups — `admins` (full access) and `users` (deny-listed from a few apps) — not per-app allow-lists.
 
@@ -111,6 +111,8 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 | Vikunja | `vikunja.${DOMAIN}` | Native OIDC |
 | Homarr | `homarr.${DOMAIN}` | Native OIDC |
 | Vaultwarden | `vault.${DOMAIN}` | None yet (candidate) |
+| Matrix (Synapse) | `matrix.${DOMAIN}` | Native OIDC (Authelia) + native Synapse accounts (registration closed, admin-created) side by side |
+| Element Web | `chat.${DOMAIN}` | — (client only; auth happens against Synapse) |
 | LLDAP | internal-only (Tailscale) | — (identity backend) |
 | Traefik | — | — (the proxy layer itself; owns public TLS directly) |
 
@@ -120,7 +122,8 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 - **CommaFeed** → replaced by FreshRSS (no viable SSO path existed for CommaFeed).
 - **MinIO** → its open-source Console SSO was removed upstream by the vendor (and the project's GitHub repo was later archived entirely); no direct replacement currently running.
 - **RustFS** → attempted MinIO replacement; abandoned after real, unresolved OIDC and data-durability bugs surfaced in the beta software.
-- A handful of others (`bandcampsync`, `matrix`, `n8n`, `nextcloud`, `qbittorrentvpn`) predate the SSO rollout — see git history for context on each.
+- A handful of others (`bandcampsync`, `n8n`, `nextcloud`, `qbittorrentvpn`) predate the SSO rollout — see git history for context on each.
+- **`archived/matrix`** — an earlier, incomplete Matrix attempt (dead config, never actually deployed — see its own history for the DB-password lesson learned). Superseded by the working `apps/matrix` + `apps/element-web`, deliberately kept off the SSO pattern above and fully non-federated by design. See `apps/matrix/SETUP.md`.
 
 For the full blow-by-blow — every gotcha, every bug, every decision and why — see **`migration_plan.md`**. It's a working log, not polished docs, but it's the ground truth for anything not obvious from the compose files themselves.
 

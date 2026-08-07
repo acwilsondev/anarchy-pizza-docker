@@ -1,0 +1,25 @@
+services:
+
+  element-web:
+    image: vectorim/element-web:latest
+    container_name: element-web
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.element.rule=Host(`chat.${DOMAIN}`)
+      - traefik.http.routers.element.entrypoints=websecure
+      - traefik.http.routers.element.tls.certresolver=le
+      - traefik.http.services.element.loadbalancer.server.port=80
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true
