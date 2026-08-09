@@ -22,10 +22,13 @@ services:
       - ${STORAGE_ROOT}/silver/lldap/bootstrap:/bootstrap:ro
     ports:
       # LDAP and the admin web UI are intentionally NOT routed through
-      # Traefik/NPM - bound only to this host's Tailscale interface, so
-      # the UI is reachable at http://${TAILSCALE_IP}:17170 from tailnet
-      # devices only, never the public internet or plain LAN.
-      - "${TAILSCALE_IP}:17170:17170"
+      # Traefik/NPM. Bound to loopback only; exposed to the tailnet via
+      # `tailscale serve --bg --tcp=17170 tcp://127.0.0.1:17170` instead
+      # of a direct host-port bind to the Tailscale IP. Binding straight
+      # to ${TAILSCALE_IP} raced tailscaled's own boot sequence and left
+      # lldap permanently detached from the Docker network after a host
+      # reboot - see incidents/2026-08-09-lldap-authelia-outage.md.
+      - "127.0.0.1:17170:17170"
     deploy:
       resources:
         limits:
