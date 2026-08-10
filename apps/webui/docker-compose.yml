@@ -9,6 +9,12 @@ services:
       # email match, no pre-existing account needed (unlike Calibre-web).
       - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=Remote-Email
       - WEBUI_AUTH_TRUSTED_NAME_HEADER=Remote-Name
+      # Web search via apps/searxng, called container-to-container (never
+      # through Traefik/Authelia - see that instance's limiter.toml for
+      # why the internal subnet is allowlisted there).
+      - ENABLE_WEB_SEARCH=true
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
     volumes:
       - ${STORAGE_ROOT}/bronze/ollama:/root/.ollama
       - ${STORAGE_ROOT}/silver/open-webui:/app/backend/data

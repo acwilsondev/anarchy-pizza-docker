@@ -80,7 +80,7 @@ Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never
 
 | Pattern | How it works | Apps using it |
 |---|---|---|
-| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma |
+| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG |
 | **Header-auth SSO** | Authelia forwards a trusted header (`Remote-User`/`Remote-Email`); the app trusts it directly — real single login | FreshRSS, Calibre-web, Open WebUI |
 | **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts - see `apps/matrix/SETUP.md`) |
 
@@ -105,6 +105,7 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 | Authelia | `auth.${DOMAIN}` | — (it's the SSO provider) |
 | Dozzle | `dozzle.${DOMAIN}` | Forward-auth gate |
 | Uptime Kuma | `uptime.${DOMAIN}` | Forward-auth gate |
+| SearXNG | `search.${DOMAIN}` | Forward-auth gate |
 | FreshRSS | `news.${DOMAIN}` | Header-auth SSO |
 | Calibre-web | `library.${DOMAIN}` | Header-auth SSO |
 | Open WebUI | `llm.${DOMAIN}` | Header-auth SSO |
