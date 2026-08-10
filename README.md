@@ -63,7 +63,7 @@ bash update-all-apps.sh
 ### 5. Point DNS at your server
 Every subdomain used by a Traefik-labeled app (`dozzle.${DOMAIN}`, `auth.${DOMAIN}`, etc) needs an A/AAAA record pointing at your server's public IP. Traefik handles TLS itself now (Let's Encrypt, HTTP-01) — no manual proxy-host setup needed per app, unlike earlier versions of this stack that chained through Nginx Proxy Manager. A new app just needs `traefik.enable=true` labels and correct DNS; the certificate is issued automatically on first request.
 
-See `migration_plan.md` for the full history of how this pattern evolved, every gotcha hit along the way, and the NPM→Traefik cutover itself (including a live incident worth reading before touching a shared router's TLS config).
+See `archived/migration_plan.md` for the full history of how this pattern evolved, every gotcha hit along the way, and the NPM→Traefik cutover itself (including a live incident worth reading before touching a shared router's TLS config). A new `migration_plan.md` now tracks the in-progress Kubernetes/Helm/Argo CD migration.
 
 ## 🏗️ Architecture Overview
 
@@ -126,7 +126,7 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 - A handful of others (`bandcampsync`, `n8n`, `nextcloud`, `qbittorrentvpn`) predate the SSO rollout — see git history for context on each.
 - **`archived/matrix`** — an earlier, incomplete Matrix attempt (dead config, never actually deployed — see its own history for the DB-password lesson learned). Superseded by the working `apps/matrix` + `apps/element-web`, deliberately kept off the SSO pattern above and fully non-federated by design. See `apps/matrix/SETUP.md`.
 
-For the full blow-by-blow — every gotcha, every bug, every decision and why — see **`migration_plan.md`**. It's a working log, not polished docs, but it's the ground truth for anything not obvious from the compose files themselves.
+For the full blow-by-blow — every gotcha, every bug, every decision and why — see **`archived/migration_plan.md`** (Traefik/Authelia SSO rollout) and **`migration_plan.md`** (in-progress Kubernetes/Helm/Argo CD migration). Working logs, not polished docs, but the ground truth for anything not obvious from the compose files themselves.
 
 ## 🔒 Security Notes
 
