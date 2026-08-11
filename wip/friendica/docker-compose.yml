@@ -1,0 +1,82 @@
+services:
+
+  friendica:
+    image: friendica:apache
+    container_name: friendica
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ}
+      FRIENDICA_TZ: ${TZ}
+    volumes:
+      - ${STORAGE_ROOT}/silver/friendica/html:/var/www/html
+    depends_on:
+      friendica-mariadb:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.friendica.rule=Host(`friendica.${DOMAIN}`)
+      - traefik.http.routers.friendica.entrypoints=web
+      - traefik.http.routers.friendica.middlewares=authelia@docker
+      - traefik.http.services.friendica.loadbalancer.server.port=80
+      - traefik.http.routers.friendica-secure.rule=Host(`friendica.${DOMAIN}`)
+      - traefik.http.routers.friendica-secure.entrypoints=websecure
+      - traefik.http.routers.friendica-secure.tls.certresolver=le
+      - traefik.http.routers.friendica-secure.service=friendica
+      # Authelia gate is the actual federation kill switch for now - see
+      # SETUP.md. Every path (including /inbox, /.well-known/webfinger)
+      # sits behind it, so remote ActivityPub servers can't deliver or
+      # discover anything here. Removing this one line is the entire
+      # "go public/federated" step later.
+      - traefik.http.routers.friendica-secure.middlewares=authelia@docker
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    networks:
+      - anarchy-pizza
+
+  friendica-worker:
+    image: friendica:apache
+    container_name: friendica-worker
+    restart: unless-stopped
+    entrypoint: ["/docker-cron.sh"]
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ}
+      FRIENDICA_TZ: ${TZ}
+    volumes:
+      - ${STORAGE_ROOT}/silver/friendica/html:/var/www/html
+    depends_on:
+      friendica-mariadb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - anarchy-pizza
+
+  friendica-mariadb:
+    image: mariadb:11
+    container_name: friendica-mariadb
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_ROOT}/silver/friendica-mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

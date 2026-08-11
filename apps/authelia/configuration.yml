@@ -33,6 +33,9 @@ access_control:
     - domain: "uptime.anarchy.pizza"
       subject: "group:users"
       policy: deny
+    - domain: "friendica.anarchy.pizza"
+      subject: "group:users"
+      policy: deny
     - domain: "*.anarchy.pizza"
       subject: "group:admins"
       policy: one_factor

@@ -80,13 +80,15 @@ Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never
 
 | Pattern | How it works | Apps using it |
 |---|---|---|
-| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG |
+| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG, Friendica (here for a different reason — see below) |
 | **Header-auth SSO** | Authelia forwards a trusted header (`Remote-User`/`Remote-Email`); the app trusts it directly — real single login | FreshRSS, Calibre-web, Open WebUI |
 | **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts - see `apps/matrix/SETUP.md`) |
 
 Access is role-based via two LDAP groups — `admins` (full access) and `users` (deny-listed from a few apps) — not per-app allow-lists.
 
 Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, not yet wired up — it is on Traefik/TLS now, just not behind Authelia), and **LLDAP** (internal-only by design, see above).
+
+**Friendica** (staged in `wip/`, not yet deployed) is a special case: it's on the forward-auth gate not as a login mechanism but as a federation kill switch. It's a federated (ActivityPub) app with no in-app way to disable federation, so the Authelia gate — sitting in front of every path, including `/inbox` and `/.well-known/webfinger` — is what will keep it unreachable by other servers once it's deployed. See `wip/friendica/SETUP.md` for the full reasoning and how to go public/federated later.
 
 ### Storage tiers
 - `gold/`: Fast storage (SSD/NVMe) for databases and high-IO apps.
@@ -116,6 +118,9 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 | Element Web | `chat.${DOMAIN}` | — (client only; auth happens against Synapse) |
 | LLDAP | internal-only (Tailscale) | — (identity backend) |
 | Traefik | — | — (the proxy layer itself; owns public TLS directly) |
+
+**Work in progress** (`wip/`) — staged, not deployed; `update-all-apps.sh` only walks `apps/`, so these are inert until moved:
+- **Friendica** (`wip/friendica/`) — planned at `friendica.${DOMAIN}`, forward-auth gate (federation intentionally off until it's moved to `apps/` — see `wip/friendica/SETUP.md`).
 
 **Archived** (`archived/`) — retired or replaced, compose files kept for reference, data intentionally left on disk rather than deleted:
 - **Nginx Proxy Manager (NPM)** → fully retired once Traefik took over public TLS/routing directly. Kept as an instant rollback path (`docker compose up -d` in `apps/npm`), not deleted.
