@@ -1,0 +1,11 @@
+# crowdsecurity/traefik-logs' own filter only matches evt.Parsed.program,
+# which is only set when logs arrive wrapped in syslog. Reading Traefik's
+# log via the docker datasource never sets it, so this stamps it from the
+# acquisition label instead, upstream of the stock parser, unmodified.
+filter: "evt.Line.Labels.type == 'traefik'"
+name: local/set-traefik-program
+stage: s00-raw
+onsuccess: continue
+statics:
+  - parsed: program
+    value: traefik

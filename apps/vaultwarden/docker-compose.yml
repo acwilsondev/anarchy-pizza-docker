@@ -8,6 +8,11 @@ services:
       WEBSOCKET_ENABLED: "true"
       DOMAIN: ${VAULTWARDEN_DOMAIN}
       TZ: ${TZ}
+      # Both required for crowdsec's Dominic-Wagner/vaultwarden collection to
+      # see failed-login attempts with a usable client IP and a UTC-anchored
+      # timestamp - see apps/crowdsec/SETUP.md.
+      IP_HEADER: "X-Forwarded-For"
+      LOG_TIMESTAMP_FORMAT: "%Y-%m-%d %H:%M:%S.%3f%z"
     volumes:
       - ${STORAGE_ROOT}/gold/vault:/data
     healthcheck:

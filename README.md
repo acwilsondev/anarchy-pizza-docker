@@ -70,10 +70,13 @@ See `archived/migration_plan.md` for the full history of how this pattern evolve
 ### Request path
 ```
 Internet → Traefik (public TLS via Let's Encrypt, ports 80/443)
-              → Authelia (forward-auth or OIDC, as needed)
-                  → the app
+              → CrowdSec bouncer (entrypoint-level middleware, every router)
+                  → Authelia (forward-auth or OIDC, as needed)
+                      → the app
 ```
 Traefik owns the public edge directly and terminates TLS itself (Let's Encrypt, HTTP-01). Nginx Proxy Manager, which used to sit in front of Traefik doing this job, has been fully retired — its compose file and data are kept on disk as an instant rollback path (`docker compose up -d` in `apps/npm`), but it is not running. Every app is reachable only over the internal `anarchy-pizza` Docker network otherwise — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice, more than once).
+
+**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`apps/crowdsec/`) reads Traefik's and Vaultwarden's container logs directly via the Docker socket (no file mounts) and feeds ban decisions to a Traefik plugin applied at the entrypoint level — so every current and future router gets it automatically, no per-app labels required. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI). See `apps/crowdsec/SETUP.md` for the (one-time, order-dependent) bootstrap.
 
 ### Single sign-on: three patterns, by what the app supports
 Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never exposed publicly) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
@@ -118,6 +121,7 @@ Dozzle gives real-time logs for every container in a web UI — behind SSO at `h
 | Element Web | `chat.${DOMAIN}` | — (client only; auth happens against Synapse) |
 | LLDAP | internal-only (Tailscale) | — (identity backend) |
 | Traefik | — | — (the proxy layer itself; owns public TLS directly) |
+| CrowdSec | — (internal LAPI only, `crowdsec:8080`) | — (edge protection layer for every app above; see Architecture Overview) |
 
 **Work in progress** (`wip/`) — staged, not deployed; `update-all-apps.sh` only walks `apps/`, so these are inert until moved:
 - **Friendica** (`wip/friendica/`) — planned at `friendica.${DOMAIN}`, forward-auth gate (federation intentionally off until it's moved to `apps/` — see `wip/friendica/SETUP.md`).
@@ -140,6 +144,7 @@ For the full blow-by-blow — every gotcha, every bug, every decision and why �
 - **LLDAP's admin UI is intentionally never exposed publicly** — it manages every account in the system, including Authelia's own. It's bound to this host's Tailscale interface only.
 - Real secrets (LDAP bind passwords, OIDC client secrets, encryption keys) live host-only under `${STORAGE_ROOT}/silver/*/secrets/` and are **not** committed to git — only placeholder `.env.example` files are tracked.
 - A pre-commit hook (`.githooks/pre-commit`, wired up by `bootstrap.sh` via `core.hooksPath`) runs [gitleaks](https://github.com/gitleaks/gitleaks) against staged changes and blocks the commit if it finds anything secret-shaped. Requires `gitleaks` on `PATH` (`sudo apt install gitleaks`, or see the linked install docs) — the hook refuses to commit unscanned if it's missing. Bypass with `git commit --no-verify` only for confirmed false positives.
+- **CrowdSec is edge protection, not an auth replacement.** It bans IPs after they trip a scenario (repeated failed logins, scanning, known-bad community IPs) — it doesn't gate access the way Authelia does. Apps not yet behind Authelia (Vaultwarden) still need their own login to actually be strong; CrowdSec just makes brute-forcing it much more expensive.
 
 ## ⚠️ Disclaimer
 

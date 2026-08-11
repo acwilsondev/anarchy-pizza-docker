@@ -1,0 +1,13 @@
+source: docker
+container_name_regexp:
+  # Unanchored - the Docker API reports container names with a leading
+  # slash ("/traefik"), so an anchored ^traefik$ never matches anything.
+  - traefik
+labels:
+  type: traefik
+---
+source: docker
+container_name_regexp:
+  - vaultwarden
+labels:
+  type: Vaultwarden

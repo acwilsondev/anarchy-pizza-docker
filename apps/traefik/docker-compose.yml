@@ -22,6 +22,19 @@ services:
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=webinsecure
       - --log.level=INFO
+      # Access log to stdout (JSON) - crowdsec reads it via the docker
+      # socket, no file mount needed. See apps/crowdsec/SETUP.md.
+      - --accesslog=true
+      - --accesslog.format=json
+      # CrowdSec bouncer plugin - the middleware itself (crowdsec@docker) is
+      # defined via labels on the crowdsec container, same pattern as
+      # authelia@docker on the authelia container. Applying it at the
+      # entrypoint level means every router gets it automatically, before
+      # any router's own middleware chain (e.g. Authelia forward-auth).
+      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - --experimental.plugins.bouncer.version=v1.7.1
+      - --entrypoints.webinsecure.http.middlewares=crowdsec@docker
+      - --entrypoints.websecure.http.middlewares=crowdsec@docker
     environment:
       - TZ=${TZ}
     volumes:
