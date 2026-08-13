@@ -1,6 +1,16 @@
 serverName: matrix.anarchy.pizza
 publicServerName: matrix.anarchy.pizza
 
+signingkey:
+  # Per the chart's own docs: "After the initial install, the job
+  # should be disabled to speed up subsequent upgrades." Left enabled,
+  # it re-runs on every Argo CD sync, which also cycles the main pod -
+  # exactly the "Progressing" flicker seen after every refresh. The
+  # signing key already exists (federation is disabled anyway, so it's
+  # not federation-critical either way).
+  job:
+    enabled: false
+
 postgresql:
   enabled: false
 redis:
