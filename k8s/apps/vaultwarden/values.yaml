@@ -1,0 +1,16 @@
+domain: "https://vault.anarchy.pizza"
+signupsAllowed: true
+
+storage:
+  data:
+    name: "vaultwarden-data"
+    size: "5Gi"
+    accessMode: "ReadWriteOnce"
+    path: "/data"
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
