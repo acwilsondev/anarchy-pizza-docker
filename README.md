@@ -2,6 +2,8 @@
 
 This repository is a curated collection of Docker Compose configurations for various self-hosted applications. It's designed as a "Reference Architecture" to help friends and fellow enthusiasts set up a robust, portable, and easily maintainable home server stack — including a full single sign-on layer, not just individual apps.
 
+**As of 2026-08-13, the live stack runs on k3s, not Docker Compose.** Every app in the table below was migrated to Kubernetes (Helm charts, Argo CD GitOps sync) — see `k8s/README.md` for the k8s-side layout and `migration_plan.md` for the full migration story, every real bug hit along the way, and why. The Docker Compose configs below remain fully intact and documented (every app's `docker-compose.yml`, its own `.env.example`, real data on disk) as an instant rollback path — `docker compose up -d` in any `apps/<app>/` brings that app's old Compose version back — but Compose itself is not the live path anymore, and the sections below describe how the stack *used to* run day-to-day, not how it runs now. Everything from **Architecture Overview** onward (SSO patterns, storage tiers, security posture) still applies conceptually; only the actual runtime (Compose → k3s) changed.
+
 ## ✨ Key Features
 
 - **Standardized Structure**: Each app lives in its own directory with its own `docker-compose.yml`.
@@ -21,6 +23,10 @@ This repository is a curated collection of Docker Compose configurations for var
 - **(Optional) [Tailscale](https://tailscale.com/)**: this reference keeps LLDAP's admin UI off the public internet entirely, reachable only over a tailnet.
 
 ## 🚀 Getting Started
+
+**For the current live deployment (k3s):** see `k8s/README.md` for the directory layout and `migration_plan.md` for the full setup story. Broad strokes: k3s + Helm + Argo CD, one Argo CD `Application` per app under `k8s/apps/`, auto-synced from this repo. There's no separate "run this to deploy" script — pushing to `main` is the deploy mechanism.
+
+The steps below describe the **Docker Compose path** — still fully functional as a rollback, and the reference for what each app's k3s config mirrors, but not how the live stack actually runs day-to-day anymore.
 
 ### 1. Clone and Initialize
 ```bash
@@ -74,12 +80,12 @@ Internet → Traefik (public TLS via Let's Encrypt, ports 80/443)
                   → Authelia (forward-auth or OIDC, as needed)
                       → the app
 ```
-Traefik owns the public edge directly and terminates TLS itself (Let's Encrypt, HTTP-01). Nginx Proxy Manager, which used to sit in front of Traefik doing this job, has been fully retired — its compose file and data are kept on disk as an instant rollback path (`docker compose up -d` in `apps/npm`), but it is not running. Every app is reachable only over the internal `anarchy-pizza` Docker network otherwise — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice, more than once).
+Traefik owns the public edge directly and terminates TLS itself (Let's Encrypt, HTTP-01) — in the current k3s deployment, via a `Certificate`/`ClusterIssuer` through cert-manager rather than Traefik's own built-in ACME resolver (which the Compose version used); running both against the same domains would race each other. Nginx Proxy Manager, which used to sit in front of Traefik doing this job, has been fully retired — its compose file and data are kept on disk as an instant rollback path (`docker compose up -d` in `apps/npm`), but it is not running. Every app is reachable only through Traefik otherwise — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice, more than once).
 
-**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`apps/crowdsec/`) reads Traefik's and Vaultwarden's container logs directly via the Docker socket (no file mounts) and feeds ban decisions to a Traefik plugin applied at the entrypoint level — so every current and future router gets it automatically, no per-app labels required. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI). See `apps/crowdsec/SETUP.md` for the (one-time, order-dependent) bootstrap.
+**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`apps/crowdsec/`, Compose version — see `k8s/apps/` for the running k3s version) reads Traefik's and Vaultwarden's logs and feeds ban decisions to a Traefik plugin applied per-router (in k3s, via a shared `Middleware` referenced from every app's `IngressRoute` — functionally the same "every router gets it automatically" outcome as the Compose entrypoint-level config). The k3s version reads pod logs natively through the Kubernetes API (its own DaemonSet-based acquisition) rather than a Docker-socket mount. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI). See `apps/crowdsec/SETUP.md` for the original Compose (one-time, order-dependent) bootstrap.
 
 ### Single sign-on: three patterns, by what the app supports
-Authelia is backed by LLDAP (LDAP identity store, admin UI Tailscale-only, never exposed publicly) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
+Authelia is backed by LLDAP (LDAP identity store, never exposed publicly — Tailscale-only in the old Compose setup; in k3s, cluster-internal only via `kubectl port-forward`, arguably even stricter, though real tailnet access to the admin UI isn't wired up yet, see `migration_plan.md`) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
 
 | Pattern | How it works | Apps using it |
 |---|---|---|
@@ -102,6 +108,8 @@ Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, 
 Dozzle gives real-time logs for every container in a web UI — behind SSO at `https://dozzle.${DOMAIN}`, not on a public port. (An earlier version of this stack had it on a bare host port with zero auth; don't do that.)
 
 ## 📦 Current Apps
+
+All apps below are **live in k3s** (see `k8s/apps/<app>/`); the `apps/` directory referenced throughout this table is the Docker Compose reference/rollback config each k3s app was migrated from, not the running instance.
 
 **Active** (`apps/`):
 

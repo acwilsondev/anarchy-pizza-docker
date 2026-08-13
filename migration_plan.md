@@ -181,9 +181,174 @@ later for Vikunja/Homarr/Matrix, not this step. No Tailscale exposure of
 LLDAP's admin UI in k8s either. Neither is wired to Traefik, DNS, or the
 previously-migrated apps — that wiring is the actual cutover.
 
-Next: rollout step 5 — cut public traffic over, once every app
-(including sorting out SearXNG's limiter/trusted-proxy config, OIDC for
-the native-OIDC apps, and Tailscale exposure for LLDAP) is validated in
-k8s, keeping the Compose stack as an instant rollback throughout. Old
-Traefik/Authelia SSO rollout history archived to
+## Step 5 (full cutover) — done, 2026-08-13
+
+The whole stack now runs live in k3s. Docker Compose is fully stopped
+(all containers, including Traefik) — every compose file and every
+app's real data directory is untouched on disk as an instant rollback
+(`docker compose up -d` in any `apps/<app>/`), same posture as every
+step before this one, but this is the first step where that rollback
+path actually matters, since k3s is now the thing serving real traffic.
+
+**Backups** of every real dataset touched during migration live at
+`${STORAGE_ROOT}/backups/k3s-migration-2026-08-13/` (tarballs for
+LLDAP/Vaultwarden/FreshRSS/Calibre-web/Homarr, `pg_dump` dumps for
+Vikunja/Synapse) — taken before any stop-and-copy step, not after.
+
+### Remaining apps migrated
+
+Vaultwarden, FreshRSS, Calibre-web, Open WebUI, Vikunja, Homarr,
+Matrix/Synapse + Element-web — all now in k3s, following the same
+Argo CD Application-per-app pattern as steps 1/2/4:
+
+- **Vaultwarden** — `guerzon/vaultwarden` chart (actively maintained
+  community chart, not app-template — already encodes Vaultwarden-
+  specific correctness like the SQLite-vs-external-DB switch).
+- **FreshRSS, Calibre-web, Open WebUI** — `app-template`, header-auth
+  pattern. Open WebUI got `runtimeClassName: nvidia` +
+  `nvidia.com/gpu: 1` (the GPU-passthrough blocker, now solved — see
+  below). Calibre-web's book library is a `hostPath` straight at
+  `MEDIA_ROOT`, not copied into a PVC.
+- **Vikunja** — `app-template`, not its "official" chart
+  (`kolaente.dev`, the maintainer's personal Gitea) — that chart repo
+  had a broken TLS cert and was unreachable, same lesson as Authelia's
+  chart in step 4: verify a chart is actually usable before trusting an
+  "official" label. One Application, two controllers (vikunja +
+  postgresql) mirroring the one `docker-compose.yml`.
+- **Homarr** — `app-template`. Dropped the `docker.sock` dashboard-
+  widget feature (the blocker below) rather than building the RBAC'd
+  k8s-API rework — not missed enough yet to justify it.
+- **Matrix/Synapse + Element-web** — Synapse via
+  `ananace-charts/matrix-synapse`, with its bundled Bitnami
+  postgresql/redis subcharts disabled (Bitnami's free image tier has
+  been getting deprecated/frozen since Aug 2025) in favor of two small
+  separate `app-template` releases. Federation stays fully disabled —
+  confirmed empirically (`/_matrix/federation/v1/version` → `404
+  Unrecognized request`), not just configured and assumed. Real gotcha:
+  the chart hardcodes `resources: [client, federation]` on the main
+  listener with no values-level override; worked around via
+  `extraConfig.listeners` landing as a second `listeners:` key in the
+  rendered `homeserver.yaml`, which Synapse's YAML loader resolves using
+  the *last* value for a duplicate key — verified against the actual
+  rendered config and the running pod's behavior, not assumed.
+
+### Real data migrated (not fresh/empty)
+
+Per your call to prioritize full parity over a quick fresh cutover: real
+data copied in for every app that had any, via the same
+backup → stop-Compose-container → copy-into-k8s-PVC → restart pattern
+established for LLDAP in step 4 (file copy for
+LLDAP/Vaultwarden/FreshRSS/Calibre-web/Homarr/Open WebUI's chat history;
+`pg_dump`/`pg_restore` for Vikunja and Synapse's Postgres-backed data,
+since raw file copy isn't safe for a live database and isn't needed —
+dump/restore only moves data, not credentials, so the fresh k8s DB
+passwords never needed to match production's).
+
+- Open WebUI's Ollama models (~55GB) are a `hostPath` straight at the
+  real `bronze/ollama` directory, **not** a PVC — k3s's
+  `local-path-provisioner` defaults to the OS disk
+  (`/var/lib/rancher/k3s/storage`, on the root LVM volume), not the
+  dedicated bulk-storage disk (`/storage`, `/dev/sda`) this repo's
+  tiering actually lives on. Copying 55GB onto the wrong disk was
+  caught before doing it, not after.
+- Matrix/Synapse real gotcha: assumed `server_name` matched the bare
+  domain (`anarchy.pizza`) — wrong, production has always used
+  `matrix.anarchy.pizza` (`SYNAPSE_SERVER_NAME` in the Compose `.env`).
+  Synapse correctly refused to start against the restored real database
+  ("Found users in database not native to anarchy.pizza") until fixed.
+- Two real secret-handling mistakes happened along the way and are
+  worth remembering rather than burying: a `base64 -d | head` command
+  printed the real Authelia OIDC `hmac_secret` and part of the RSA
+  signing key into the session transcript (both regenerated
+  immediately, treated as compromised); and reading FreshRSS's `.env`
+  with `cat` printed the real admin password (not regenerated, but
+  flagged for rotation — it's an already-known account password, not a
+  newly-exposed one). Lesson: redirect secret reads to files/variables,
+  never let them hit a place you'll read directly, even mid-migration
+  under time pressure.
+- Authelia's own internal `db.sqlite3` (sessions, regulation/ban state,
+  any TOTP registrations) was **not** migrated — wasn't in the original
+  data list, and this stack uses `one_factor` everywhere (no TOTP
+  enforced), so there's little to lose. Flagged, not silently dropped.
+
+### OIDC wired up for real
+
+`identity_providers.oidc` added to the k3s Authelia's config (second
+`--config` file, same deep-merge pattern already proven in production —
+see `archived/migration_plan.md`), fresh `hmac_secret` + 4096-bit RSA
+key. Vikunja/Homarr/Matrix registered as clients, each with its own
+correct `token_endpoint_auth_method` (Vikunja/Matrix:
+`client_secret_post`, Homarr: `client_secret_basic` — not copy-pasted
+from one to the others). Matrix's client secret couldn't go through the
+Synapse chart's `extraSecrets` values field without landing in git, so
+it rides in on the chart's own secret-injection mechanism instead (see
+`k8s/apps/matrix-synapse/values.yaml` for the mechanics).
+
+### The cutover itself
+
+Traefik deployed via the official chart (not k3s's bundled one, still
+disabled) — `hostPort` 80/443, matching exactly how the Compose Traefik
+it replaced already worked, since ServiceLB is also disabled and this
+is single-node. cert-manager owns certificate issuance (not Traefik's
+own ACME resolver, which would race it) via a `ClusterIssuer` +
+one multi-SAN `Certificate` covering all 12 app domains, referenced
+through a `TLSStore` named `default` so every app's `IngressRoute` just
+sets `tls: {}` without a per-namespace copy of the cert secret. Two real
+bugs caught before any real traffic was affected: cross-namespace
+`Middleware` references are disabled by default in the chart (would
+have meant zero Authelia/CrowdSec protection on every route despite the
+config looking correct), and the http→https redirect field was nested
+one level too shallow (caught by Argo CD's own schema validation).
+
+**IPv6 detour, reverted:** cert-manager's HTTP-01 validation failed for
+all 12 domains — DNS was correct, but the fresh k3s cluster is
+single-stack IPv4 internally (`10.42.0.0/24` pod CIDR), unlike Docker's
+dual-stack-by-default port publishing, so `hostPort` had no IPv6 pod
+address to forward to. Attempted a live dual-stack reconversion
+(`cluster-cidr`/`service-cidr` config + node re-registration); the
+Kubernetes API forbids changing a node's `podCIDRs` except from empty,
+and simply deleting the Node object didn't produce a truly empty one
+(k3s appears to cache the allocation internally) — this caused a real
+~15-minute k3s control-plane crash loop (data plane / running pods were
+never affected). Reverted the dual-stack config, confirmed 30+ seconds
+of stable `k3s.service`, then took the simpler path: removed the AAAA
+DNS records so validation happens over IPv4 only (already proven
+working). Real dual-stack k3s networking, if wanted later, needs to be
+decided at cluster bootstrap, not retrofitted onto a live one.
+
+Verified post-cutover, not just "Traefik is Running": all 12 domains
+return the expected HTTP code (302 for forward-auth apps, 200 for
+native-OIDC/Vaultwarden) with a certificate that validates without
+`-k`/`--insecure`, i.e. a real trusted Let's Encrypt cert, not
+self-signed.
+
+### Known blockers — final status
+
+- **GPU passthrough** — solved. `nvdp/nvidia-device-plugin` installed;
+  needed a manual `nvidia.com/gpu.present=true` node label since
+  Node Feature Discovery isn't running (the chart's default node
+  affinity requires an NFD-set label otherwise).
+- **LLDAP's Tailscale exposure** — still **not** solved. LLDAP's admin
+  UI is cluster-internal only in k8s (`kubectl port-forward` for admin
+  access), which is actually a stricter posture than Compose's
+  `tailscale serve`, not a regression — but real tailnet access to the
+  admin UI, if wanted, is still open.
+- **Traefik's `docker.sock` mount** — gone, as expected, replaced by the
+  Kubernetes provider.
+- **Homarr's `docker.sock` widget** — dropped for now (see above),
+  revisit if actually missed.
+- **ACME state** — solved via cert-manager + a `Certificate`/`TLSStore`,
+  not a raw `acme.json` PVC.
+- **Storage tiers** — mixed, deliberately: `local-path-provisioner` PVCs
+  for small/medium app state, `hostPath` straight at the real
+  `STORAGE_ROOT` paths for large bulk data (Calibre-web's books,
+  Open WebUI's Ollama models) to keep it on the correct physical disk.
+- **Secrets outside git** — still unsolved as a *general* GitOps
+  mechanism (no SOPS/Sealed Secrets yet); every secret this whole
+  migration touched was applied directly to the cluster via `kubectl`,
+  never committed — consistent, but still imperative rather than
+  declarative. Worth solving properly before the next round of secret
+  rotation or a second node ever enters the picture.
+
+Old Traefik/Authelia SSO rollout history archived to
 `archived/migration_plan.md`.
