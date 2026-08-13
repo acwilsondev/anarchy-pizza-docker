@@ -1,0 +1,23 @@
+# Exposes LLDAP's admin UI (only - not the raw LDAP port) to the
+# tailnet via the Tailscale Kubernetes Operator, matching the original
+# Compose posture (127.0.0.1 bind + `tailscale serve`, admin UI only,
+# fixed after the Aug 9 boot-race incident - see
+# incidents/2026-08-09-lldap-authelia-outage.md). A separate Service
+# from the main `lldap` one (which also carries the raw LDAP port used
+# internally by Authelia) so tailnet exposure stays scoped to just the
+# admin UI, same as before.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lldap-tailscale
+  namespace: lldap
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: lldap
+spec:
+  selector:
+    app.kubernetes.io/name: lldap
+  ports:
+    - name: http
+      port: 17170
+      targetPort: 17170
