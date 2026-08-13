@@ -1,0 +1,58 @@
+# Standalone official Traefik chart - NOT k3s's bundled auto-deploy
+# Traefik (still disabled, --disable traefik from step 1). ServiceLB is
+# also disabled and this is single-node, so hostPort is the simplest,
+# most predictable choice - binds 80/443 directly on the node, same
+# mental model as the Compose Traefik it's replacing. cert-manager (not
+# Traefik's own ACME resolver) owns certificate issuance - running both
+# is a known source of duplicate-cert races.
+
+deployment:
+  replicas: 1
+
+ports:
+  web:
+    hostPort: 80
+    redirections:
+      entryPoint:
+        to: websecure
+        scheme: https
+        permanent: true
+  websecure:
+    hostPort: 443
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    # Needed for cert-manager's HTTP-01 solver, which creates a
+    # temporary plain Ingress (not IngressRoute) to serve the ACME
+    # challenge path - Traefik has to be watching Ingress resources for
+    # that to resolve, even though every real app route uses IngressRoute.
+    enabled: true
+
+experimental:
+  plugins:
+    bouncer:
+      moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      version: "v1.7.1"
+
+# Mounts the CrowdSec bouncer LAPI key (applied directly to the cluster
+# as a Secret, never committed) as a file, referenced via
+# crowdsecLapiKeyFile in k8s/apps/ingress/crowdsec-bouncer-middleware.yaml
+# - keeps the key out of git entirely, same as every other secret in
+# this migration.
+volumes:
+  - name: crowdsec-bouncer-key
+    mountPath: "/etc/traefik/crowdsec"
+    type: secret
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
