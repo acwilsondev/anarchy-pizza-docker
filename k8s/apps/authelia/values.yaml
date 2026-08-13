@@ -7,7 +7,7 @@ controllers:
           tag: latest
         args:
           - --config
-          - /config/configuration.yml
+          - /config/configuration.yml,/config/identity_providers.yml
         env:
           TZ: America/Denver
         envFrom:
@@ -40,4 +40,11 @@ persistence:
     globalMounts:
       - path: /config/configuration.yml
         subPath: configuration.yml
+        readOnly: true
+  identity-providers:
+    type: secret
+    name: authelia-identity-providers
+    globalMounts:
+      - path: /config/identity_providers.yml
+        subPath: identity_providers.yml
         readOnly: true
