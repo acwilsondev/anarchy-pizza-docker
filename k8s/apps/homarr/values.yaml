@@ -1,0 +1,43 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: ghcr.io/homarr-labs/homarr
+          tag: latest
+        env:
+          TZ: America/Denver
+          BASE_URL: "https://homarr.anarchy.pizza"
+          NEXTAUTH_URL: "https://homarr.anarchy.pizza"
+          # OIDC (AUTH_PROVIDERS=oidc, AUTH_OIDC_*) wired up in a later
+          # step once real identity data + Authelia OIDC config are in
+          # place - not part of this pass.
+        envFrom:
+          - secretRef:
+              name: homarr-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 7575
+
+persistence:
+  appdata:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    globalMounts:
+      - path: /appdata
+
+  # docker.sock widget deliberately dropped for this migration - no
+  # clean k8s equivalent without an RBAC'd ServiceAccount + k8s-API
+  # rework (see migration_plan.md). Revisit later if the widget is
+  # actually missed.
