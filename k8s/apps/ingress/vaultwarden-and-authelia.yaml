@@ -1,0 +1,40 @@
+# Vaultwarden is deliberately not behind authelia-forwardauth - matches
+# production, where it relies on its own login + CrowdSec only (native
+# OIDC support exists but isn't wired up).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`vault.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: vaultwarden
+          port: 80
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: authelia
+  namespace: authelia
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`auth.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: authelia
+          port: 9091
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}

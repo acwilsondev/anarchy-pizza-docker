@@ -1,0 +1,11 @@
+# Special reserved name "default" - every IngressRoute across every
+# namespace just sets `tls: {}` and gets this certificate automatically,
+# without needing a per-namespace copy of the secret.
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: traefik
+spec:
+  defaultCertificate:
+    secretName: anarchy-pizza-tls

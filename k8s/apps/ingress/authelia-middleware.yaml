@@ -1,0 +1,19 @@
+# Same middleware serves both patterns used across this stack: pure
+# forward-auth (Dozzle/Uptime Kuma/SearXNG - no auth of their own) and
+# header-auth (FreshRSS/Calibre-web/webui - trust the forwarded
+# Remote-User/Remote-Email headers). Matches
+# apps/authelia/docker-compose.yml's forwardauth labels exactly.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: authelia-forwardauth
+  namespace: traefik
+spec:
+  forwardAuth:
+    address: "http://authelia.authelia.svc.cluster.local:9091/api/verify?rd=https://auth.anarchy.pizza/"
+    trustForwardHeader: true
+    authResponseHeaders:
+      - Remote-User
+      - Remote-Groups
+      - Remote-Name
+      - Remote-Email

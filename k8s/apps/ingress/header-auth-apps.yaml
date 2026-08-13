@@ -1,0 +1,62 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: freshrss
+  namespace: freshrss
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`news.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: freshrss
+          port: 80
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: calibre-web
+  namespace: calibre-web
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`library.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: calibre-web
+          port: 8083
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: webui
+  namespace: webui
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`llm.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: webui
+          port: 8080
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}

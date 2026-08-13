@@ -1,0 +1,62 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dozzle
+  namespace: dozzle
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dozzle.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: dozzle
+          port: 8080
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: uptime-kuma
+  namespace: uptime-kuma
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`uptime.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: uptime-kuma
+          port: 3001
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: searxng
+  namespace: searxng
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`search.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: searxng
+          port: 8080
+      middlewares:
+        - name: authelia-forwardauth
+          namespace: traefik
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}

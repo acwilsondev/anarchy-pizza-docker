@@ -1,0 +1,75 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: vikunja
+  namespace: vikunja
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`vikunja.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: vikunja
+          port: 3456
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homarr
+  namespace: homarr
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`homarr.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: homarr
+          port: 7575
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-synapse
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`matrix.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: matrix-synapse
+          port: 8008
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: element-web
+  namespace: matrix
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`chat.anarchy.pizza`)
+      kind: Rule
+      services:
+        - name: element-web
+          port: 80
+      middlewares:
+        - name: crowdsec-bouncer
+          namespace: traefik
+  tls: {}

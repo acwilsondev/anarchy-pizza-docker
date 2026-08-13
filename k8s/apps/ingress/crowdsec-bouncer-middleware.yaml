@@ -1,0 +1,16 @@
+# Applied to every IngressRoute (matches the Compose setup, where
+# CrowdSec is wired at the entrypoint level so every router gets it
+# automatically, not per-app labels).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: crowdsec-bouncer
+  namespace: traefik
+spec:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecMode: live
+      crowdsecLapiScheme: http
+      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      crowdsecLapiKeyFile: /etc/traefik/crowdsec/BOUNCER_KEY

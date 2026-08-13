@@ -1,0 +1,27 @@
+# One multi-SAN certificate for every app's domain, rather than one
+# Certificate per app - fewer ACME issuances to manage/renew, and
+# cert-manager handles the per-domain HTTP-01 challenges internally
+# either way.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: anarchy-pizza-wildcard
+  namespace: traefik
+spec:
+  secretName: anarchy-pizza-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - auth.anarchy.pizza
+    - dozzle.anarchy.pizza
+    - uptime.anarchy.pizza
+    - search.anarchy.pizza
+    - news.anarchy.pizza
+    - library.anarchy.pizza
+    - llm.anarchy.pizza
+    - vault.anarchy.pizza
+    - vikunja.anarchy.pizza
+    - homarr.anarchy.pizza
+    - matrix.anarchy.pizza
+    - chat.anarchy.pizza
