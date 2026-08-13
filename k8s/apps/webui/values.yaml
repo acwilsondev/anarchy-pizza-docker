@@ -31,9 +31,15 @@ service:
 
 persistence:
   ollama:
-    type: persistentVolumeClaim
-    accessMode: ReadWriteOnce
-    size: 80Gi
+    # hostPath straight at the real bronze/ollama data, not a PVC -
+    # k3s's local-path-provisioner puts PVCs on the OS disk
+    # (/var/lib/rancher/k3s/storage, on /dev/mapper/ubuntu--vg-ubuntu--lv),
+    # not the dedicated bulk-storage disk (/storage, /dev/sda) this
+    # repo's gold/silver/bronze tiering actually lives on. Same pattern
+    # as Calibre-web's book library - reuse large data in place rather
+    # than duplicating ~55GB onto the wrong disk.
+    type: hostPath
+    hostPath: /storage/appdata/bronze/ollama
     globalMounts:
       - path: /root/.ollama
   data:
