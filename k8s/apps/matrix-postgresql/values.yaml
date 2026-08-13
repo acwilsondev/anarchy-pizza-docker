@@ -6,7 +6,7 @@ controllers:
           repository: postgres
           tag: "18"
         env:
-          POSTGRES_INITDB_ARGS: "--lc-collate=C --lc-ctype=C"
+          POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
         envFrom:
           - secretRef:
               name: matrix-postgres-secrets
