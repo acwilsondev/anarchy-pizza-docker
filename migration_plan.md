@@ -328,11 +328,21 @@ self-signed.
   needed a manual `nvidia.com/gpu.present=true` node label since
   Node Feature Discovery isn't running (the chart's default node
   affinity requires an NFD-set label otherwise).
-- **LLDAP's Tailscale exposure** — still **not** solved. LLDAP's admin
-  UI is cluster-internal only in k8s (`kubectl port-forward` for admin
-  access), which is actually a stricter posture than Compose's
-  `tailscale serve`, not a regression — but real tailnet access to the
-  admin UI, if wanted, is still open.
+- **LLDAP's Tailscale exposure** — solved, 2026-08-13 (post-cutover).
+  Tailscale Kubernetes Operator (`tailscale/tailscale-operator`, OAuth
+  client + `tagOwners` ACL set up directly by the user — kept out of
+  git/session context entirely), exposing a dedicated
+  `lldap-tailscale` Service (`k8s/apps/lldap/tailscale-service.yaml`,
+  admin UI port 17170 only — not the raw LDAP port Authelia uses
+  internally) via the `tailscale.com/expose`/`tailscale.com/hostname`
+  annotations. Matches the original Compose posture (admin-UI-only,
+  never on the public port) rather than the exact same mechanism.
+  Real snag hit setting it up: the OAuth client creation UI didn't show
+  a tag-selection step at all in the current admin console (differs
+  from older docs) — turned out not to matter, since tailnet
+  owners/admins get implicit access to any tag without needing to pick
+  one explicitly. The actual fix was just making sure the `tagOwners`
+  ACL edit was saved *before* generating the OAuth client.
 - **Traefik's `docker.sock` mount** — gone, as expected, replaced by the
   Kubernetes provider.
 - **Homarr's `docker.sock` widget** — dropped for now (see above),

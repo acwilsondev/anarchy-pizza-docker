@@ -1,0 +1,22 @@
+# Exposes the Argo CD UI to the tailnet, same pattern as LLDAP's admin
+# UI (k8s/apps/lldap/tailscale-service.yaml). Argo CD's own self-signed
+# cert still applies at L3 (browser will warn) - the tailnet connection
+# itself is already fully encrypted via WireGuard, so this is cosmetic,
+# not a real gap. A dedicated Service rather than annotating
+# argocd-server directly, to avoid coupling this to Argo CD's own Helm
+# release lifecycle.
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-tailscale
+  namespace: argocd
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8080
