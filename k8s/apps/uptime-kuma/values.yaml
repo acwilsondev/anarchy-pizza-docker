@@ -1,0 +1,28 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: louislam/uptime-kuma
+          tag: "2"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 3001
+
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    globalMounts:
+      - path: /app/data

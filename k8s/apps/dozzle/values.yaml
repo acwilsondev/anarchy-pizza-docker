@@ -1,0 +1,29 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: amir20/dozzle
+          tag: latest
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 8080
+
+persistence:
+  docker-sock:
+    type: hostPath
+    hostPath: /var/run/docker.sock
+    hostPathType: Socket
+    globalMounts:
+      - path: /var/run/docker.sock
+        readOnly: true

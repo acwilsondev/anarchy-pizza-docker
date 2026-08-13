@@ -1,0 +1,76 @@
+controllers:
+  searxng:
+    containers:
+      main:
+        image:
+          repository: searxng/searxng
+          tag: latest
+        env:
+          TZ: America/Denver
+          # Not exposed publicly yet - placeholder until the real cutover
+          # step assigns this a routable DNS name.
+          SEARXNG_BASE_URL: http://localhost/
+          SEARXNG_VALKEY_URL: redis://searxng-valkey:6379/0
+          SEARXNG_LIMITER: "true"
+        envFrom:
+          - secretRef:
+              name: searxng-secret
+        resources:
+          limits:
+            memory: 512Mi
+
+  valkey:
+    containers:
+      main:
+        image:
+          repository: valkey/valkey
+          tag: 9-alpine
+        args:
+          - valkey-server
+          - --save
+          - "30"
+          - "1"
+          - --loglevel
+          - warning
+        resources:
+          limits:
+            memory: 128Mi
+
+service:
+  searxng:
+    controller: searxng
+    ports:
+      http:
+        port: 8080
+  valkey:
+    controller: valkey
+    nameOverride: searxng-valkey
+    ports:
+      redis:
+        port: 6379
+
+persistence:
+  config:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 100Mi
+    advancedMounts:
+      searxng:
+        main:
+          - path: /etc/searxng
+  cache:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    advancedMounts:
+      searxng:
+        main:
+          - path: /var/cache/searxng
+  valkey-data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 256Mi
+    advancedMounts:
+      valkey:
+        main:
+          - path: /data
