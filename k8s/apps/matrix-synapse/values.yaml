@@ -68,19 +68,24 @@ synapse:
     limits:
       memory: 1024Mi
   # OIDC client config (real client_secret, generated fresh and applied
-  # directly to the cluster - never committed) rides in on the chart's
-  # own secret-injection mechanism: the container entrypoint already
-  # does `cat /synapse/secrets/*.yaml` into the loaded config, so
-  # mounting our own file into that same directory picks it up for free
-  # alongside the chart's own postgres/redis password substitution,
-  # no command/entrypoint override needed.
+  # directly to the cluster - never committed). Synapse is invoked with
+  # `-c /synapse/config/homeserver.yaml -c /synapse/config/conf.d/` and
+  # merges every yaml file under conf.d/ - mounting our file there picks
+  # it up for free. NOT mounted under /synapse/secrets (the chart's own
+  # Secret-backed volume): subPath-nesting a second Secret's file inside
+  # a directory already populated by another Secret/ConfigMap volume
+  # fails ("not a directory") - a real k8s limitation from how those
+  # volumes use an atomic symlink-swap rather than a plain directory,
+  # confirmed by the pod's actual mount error, not assumed. conf.d/ is a
+  # plain emptyDir, so nesting works the same way it already does for
+  # Authelia's configuration.yml under its PVC-backed /config.
   extraVolumes:
     - name: oidc-providers
       secret:
         secretName: matrix-oidc-providers
   extraVolumeMounts:
     - name: oidc-providers
-      mountPath: /synapse/secrets/oidc-providers.yaml
+      mountPath: /synapse/config/conf.d/oidc-providers.yaml
       subPath: oidc-providers.yaml
       readOnly: true
 
