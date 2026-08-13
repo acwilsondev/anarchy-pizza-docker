@@ -1,0 +1,41 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: freshrss/freshrss
+          tag: latest
+        env:
+          TZ: America/Denver
+          CRON_MIN: "3,33"
+          TRUSTED_PROXY: "10.42.0.0/16"
+        envFrom:
+          - secretRef:
+              name: freshrss-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 80
+
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    globalMounts:
+      - path: /var/www/FreshRSS/data
+  extensions:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 100Mi
+    globalMounts:
+      - path: /var/www/FreshRSS/extensions

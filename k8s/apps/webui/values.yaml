@@ -1,0 +1,44 @@
+controllers:
+  main:
+    pod:
+      runtimeClassName: nvidia
+    containers:
+      main:
+        image:
+          repository: ghcr.io/open-webui/open-webui
+          tag: ollama
+        env:
+          WEBUI_AUTH_TRUSTED_EMAIL_HEADER: Remote-Email
+          WEBUI_AUTH_TRUSTED_NAME_HEADER: Remote-Name
+          OLLAMA_HOST: 0.0.0.0:11434
+          ENABLE_WEB_SEARCH: "true"
+          WEB_SEARCH_ENGINE: searxng
+          SEARXNG_QUERY_URL: "http://searxng.searxng.svc.cluster.local:8080/search?q=<query>"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 8Gi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 8080
+
+persistence:
+  ollama:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 80Gi
+    globalMounts:
+      - path: /root/.ollama
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 3Gi
+    globalMounts:
+      - path: /app/backend/data

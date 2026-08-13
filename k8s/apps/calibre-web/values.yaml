@@ -1,0 +1,39 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: lscr.io/linuxserver/calibre-web
+          tag: latest
+        env:
+          PUID: "1000"
+          PGID: "1000"
+          TZ: America/Denver
+          DOCKER_MODS: linuxserver/mods:universal-calibre
+          OAUTHLIB_RELAX_TOKEN_SCOPE: "1"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 8083
+
+persistence:
+  config:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    globalMounts:
+      - path: /config
+  books:
+    type: hostPath
+    hostPath: /storage/media/books
+    globalMounts:
+      - path: /books
