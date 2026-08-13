@@ -1,0 +1,88 @@
+services:
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      GENERIC_TIMEZONE: ${TZ}
+      TZ: ${TZ}
+      N8N_HOST: n8n.${DOMAIN}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://n8n.${DOMAIN}
+      N8N_WEBHOOK_URL: https://n8n.${DOMAIN}
+      # Traefik adds one hop of X-Forwarded-* headers; without this n8n
+      # doesn't trust them and secure cookies break behind the proxy.
+      N8N_PROXY_HOPS: 1
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: n8n-postgresql
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${STORAGE_ROOT}/silver/n8n:/home/node/.n8n
+    depends_on:
+      n8n-postgresql:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+      # Editor UI - gated by Authelia like the other forward-auth apps.
+      # Explicit low priority so the webhook routers below (higher
+      # priority, more specific paths) always get first refusal - Traefik's
+      # default rule-length-based priority for this host-only rule would
+      # otherwise beat an under-specified explicit priority on those.
+      - traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN}`)
+      - traefik.http.routers.n8n.entrypoints=web
+      - traefik.http.routers.n8n.middlewares=authelia@docker
+      - traefik.http.routers.n8n.priority=1
+      - traefik.http.routers.n8n-secure.rule=Host(`n8n.${DOMAIN}`)
+      - traefik.http.routers.n8n-secure.entrypoints=websecure
+      - traefik.http.routers.n8n-secure.tls.certresolver=le
+      - traefik.http.routers.n8n-secure.service=n8n
+      - traefik.http.routers.n8n-secure.middlewares=authelia@docker
+      - traefik.http.routers.n8n-secure.priority=1
+      # Webhook/form-trigger paths deliberately bypass Authelia - these are
+      # called by external services (GitHub, Stripe, etc.) that can't do a
+      # login redirect.
+      - traefik.http.routers.n8n-webhook.rule=Host(`n8n.${DOMAIN}`) && (PathPrefix(`/webhook`) || PathPrefix(`/webhook-test`) || PathPrefix(`/webhook-waiting`) || PathPrefix(`/form`) || PathPrefix(`/form-test`) || PathPrefix(`/form-waiting`))
+      - traefik.http.routers.n8n-webhook.entrypoints=web
+      - traefik.http.routers.n8n-webhook.priority=100
+      - traefik.http.routers.n8n-webhook.service=n8n
+      - traefik.http.routers.n8n-webhook-secure.rule=Host(`n8n.${DOMAIN}`) && (PathPrefix(`/webhook`) || PathPrefix(`/webhook-test`) || PathPrefix(`/webhook-waiting`) || PathPrefix(`/form`) || PathPrefix(`/form-test`) || PathPrefix(`/form-waiting`))
+      - traefik.http.routers.n8n-webhook-secure.entrypoints=websecure
+      - traefik.http.routers.n8n-webhook-secure.tls.certresolver=le
+      - traefik.http.routers.n8n-webhook-secure.priority=100
+      - traefik.http.routers.n8n-webhook-secure.service=n8n
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    networks:
+      - anarchy-pizza
+
+  n8n-postgresql:
+    image: postgres:18
+    container_name: n8n-postgresql
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_ROOT}/silver/n8n-postgresql:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - anarchy-pizza
+
+networks:
+  anarchy-pizza:
+    name: anarchy-pizza
+    external: true

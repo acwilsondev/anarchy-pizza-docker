@@ -9,6 +9,10 @@ services:
       # email match, no pre-existing account needed (unlike Calibre-web).
       - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=Remote-Email
       - WEBUI_AUTH_TRUSTED_NAME_HEADER=Remote-Name
+      # Ollama defaults to 127.0.0.1 only, unreachable from other
+      # containers (e.g. n8n) even on the shared anarchy-pizza network.
+      # Binding 0.0.0.0 is still internal-only - no host port is published.
+      - OLLAMA_HOST=0.0.0.0:11434
       # Web search via apps/searxng, called container-to-container (never
       # through Traefik/Authelia - see that instance's limiter.toml for
       # why the internal subnet is allowlisted there).
