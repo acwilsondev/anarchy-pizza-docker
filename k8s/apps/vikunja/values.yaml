@@ -10,9 +10,17 @@ controllers:
           VIKUNJA_SERVICE_ENABLEREGISTRATION: "false"
           VIKUNJA_DATABASE_TYPE: postgres
           VIKUNJA_DATABASE_HOST: vikunja-postgresql
+          VIKUNJA_AUTH_OPENID_ENABLED: "true"
+          VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_NAME: Authelia
+          VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL: "https://auth.anarchy.pizza"
+          VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID: vikunja
+          VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_SCOPE: "openid profile email"
+          VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_EMAILFALLBACK: "true"
         envFrom:
           - secretRef:
               name: vikunja-secrets
+          - secretRef:
+              name: vikunja-oidc-secrets
         resources:
           requests:
             cpu: 10m

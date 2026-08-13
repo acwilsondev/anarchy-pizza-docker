@@ -67,6 +67,22 @@ synapse:
       memory: 256Mi
     limits:
       memory: 1024Mi
+  # OIDC client config (real client_secret, generated fresh and applied
+  # directly to the cluster - never committed) rides in on the chart's
+  # own secret-injection mechanism: the container entrypoint already
+  # does `cat /synapse/secrets/*.yaml` into the loaded config, so
+  # mounting our own file into that same directory picks it up for free
+  # alongside the chart's own postgres/redis password substitution,
+  # no command/entrypoint override needed.
+  extraVolumes:
+    - name: oidc-providers
+      secret:
+        secretName: matrix-oidc-providers
+  extraVolumeMounts:
+    - name: oidc-providers
+      mountPath: /synapse/secrets/oidc-providers.yaml
+      subPath: oidc-providers.yaml
+      readOnly: true
 
 persistence:
   enabled: true

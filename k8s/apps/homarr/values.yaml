@@ -9,12 +9,20 @@ controllers:
           TZ: America/Denver
           BASE_URL: "https://homarr.anarchy.pizza"
           NEXTAUTH_URL: "https://homarr.anarchy.pizza"
-          # OIDC (AUTH_PROVIDERS=oidc, AUTH_OIDC_*) wired up in a later
-          # step once real identity data + Authelia OIDC config are in
-          # place - not part of this pass.
+          AUTH_PROVIDERS: oidc
+          AUTH_OIDC_AUTO_LOGIN: "true"
+          AUTH_OIDC_ISSUER: "https://auth.anarchy.pizza"
+          AUTH_OIDC_CLIENT_ID: homarr
+          AUTH_OIDC_CLIENT_NAME: Authelia
+          AUTH_OIDC_SCOPE_OVERWRITE: "openid email profile groups"
+          AUTH_OIDC_GROUPS_ATTRIBUTE: groups
+          AUTH_OIDC_FORCE_USERINFO: "true"
+          AUTH_LOGOUT_REDIRECT_URL: "https://auth.anarchy.pizza/logout"
         envFrom:
           - secretRef:
               name: homarr-secrets
+          - secretRef:
+              name: homarr-oidc-secrets
         resources:
           requests:
             cpu: 10m
