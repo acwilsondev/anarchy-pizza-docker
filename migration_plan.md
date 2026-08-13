@@ -92,7 +92,21 @@ a working rollback available at every step:
    same posture used keeping `apps/npm`'s compose file and data around
    after the Traefik cutover.
 
-## Status as of 2026-08-10
+## Status as of 2026-08-13
 
-Planning only. Nothing installed, nothing migrated. Old Traefik/Authelia
-SSO rollout history archived to `archived/migration_plan.md`.
+Step 1 (stand up k3s alongside Compose) done. k3s (Traefik/ServiceLB
+disabled to avoid the port 80/443 conflict), Helm, and Argo CD are
+installed and running on the same box. Argo CD watches this repo
+(`k8s/apps/`, app-of-apps root at `k8s/argocd/root-app.yaml`, read-only
+deploy key) with automated sync + prune + self-heal. The GitOps loop was
+proven end-to-end with a throwaway smoke-test app — pushed, synced,
+served traffic, then removed from git and auto-pruned from the cluster
+— and has since been deleted, leaving `k8s/apps/` empty and ready for
+the first real migration.
+
+The Compose stack was never touched: all 18 containers stayed up and
+were not restarted or reconfigured at any point during this step.
+
+Next: rollout step 2 — migrate Dozzle, Uptime Kuma, SearXNG (see
+"Planned rollout order" above). Old Traefik/Authelia SSO rollout history
+archived to `archived/migration_plan.md`.
