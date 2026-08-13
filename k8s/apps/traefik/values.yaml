@@ -28,6 +28,12 @@ ingressRoute:
 providers:
   kubernetesCRD:
     enabled: true
+    # Every app's IngressRoute references the shared
+    # crowdsec-bouncer/authelia-forwardauth Middlewares (living in the
+    # traefik namespace) cross-namespace - disabled by default. Caught
+    # from Traefik's own startup logs ("allowCrossNamespace is disabled"
+    # on every single IngressRoute) before any real traffic hit it.
+    allowCrossNamespace: true
   kubernetesIngress:
     # Needed for cert-manager's HTTP-01 solver, which creates a
     # temporary plain Ingress (not IngressRoute) to serve the ACME
