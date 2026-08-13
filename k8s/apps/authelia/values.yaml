@@ -1,0 +1,43 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: authelia/authelia
+          tag: latest
+        args:
+          - --config
+          - /config/configuration.yml
+        env:
+          TZ: America/Denver
+        envFrom:
+          - secretRef:
+              name: authelia-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 9091
+
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 128Mi
+    globalMounts:
+      - path: /config
+  config:
+    type: configMap
+    name: authelia-config
+    globalMounts:
+      - path: /config/configuration.yml
+        subPath: configuration.yml
+        readOnly: true

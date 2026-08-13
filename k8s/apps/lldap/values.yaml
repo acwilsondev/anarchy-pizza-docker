@@ -1,0 +1,50 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: lldap/lldap
+          tag: stable
+        env:
+          TZ: America/Denver
+          LLDAP_LDAP_BASE_DN: dc=anarchy,dc=pizza
+          USER_CONFIGS_DIR: /bootstrap/user-configs
+          GROUP_CONFIGS_DIR: /bootstrap/group-configs
+        envFrom:
+          - secretRef:
+              name: lldap-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      ldap:
+        port: 3890
+      http:
+        port: 17170
+
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 256Mi
+    globalMounts:
+      - path: /data
+  bootstrap-users:
+    type: secret
+    name: lldap-bootstrap-users
+    globalMounts:
+      - path: /bootstrap/user-configs
+        readOnly: true
+  bootstrap-groups:
+    type: configMap
+    name: lldap-bootstrap-groups
+    globalMounts:
+      - path: /bootstrap/group-configs
+        readOnly: true
