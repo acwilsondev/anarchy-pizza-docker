@@ -10,7 +10,10 @@ controllers:
           # Not exposed publicly yet - placeholder until the real cutover
           # step assigns this a routable DNS name.
           SEARXNG_BASE_URL: http://localhost/
-          SEARXNG_VALKEY_URL: redis://searxng-valkey:6379/0
+          # app-template's Service naming for a non-"main" key ends up as
+          # <release>-<release>-<key> here, not a plain override - verified
+          # against the actual Service object rather than assumed.
+          SEARXNG_VALKEY_URL: redis://searxng-searxng-valkey:6379/0
           SEARXNG_LIMITER: "true"
         envFrom:
           - secretRef:
