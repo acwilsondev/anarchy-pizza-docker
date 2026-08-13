@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: element-web
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://ananace.gitlab.io/charts
+      chart: element-web
+      targetRevision: 1.4.42
+      helm:
+        valueFiles:
+          - $values/k8s/apps/element-web/values.yaml
+    - repoURL: git@github.com:acwilsondev/anarchy-pizza-docker.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: matrix
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

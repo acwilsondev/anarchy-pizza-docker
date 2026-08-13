@@ -1,0 +1,17 @@
+defaultServer:
+  url: "https://matrix.anarchy.pizza"
+  name: "matrix.anarchy.pizza"
+
+config:
+  disable_custom_urls: true
+  disable_guests: true
+  brand: "Element"
+  m.identity_server:
+    base_url: null
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

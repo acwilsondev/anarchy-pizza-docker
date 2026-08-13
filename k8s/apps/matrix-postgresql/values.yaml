@@ -1,0 +1,33 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: postgres
+          tag: "18"
+        env:
+          POSTGRES_INITDB_ARGS: "--lc-collate=C --lc-ctype=C"
+        envFrom:
+          - secretRef:
+              name: matrix-postgres-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      postgres:
+        port: 5432
+
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    globalMounts:
+      - path: /var/lib/postgresql

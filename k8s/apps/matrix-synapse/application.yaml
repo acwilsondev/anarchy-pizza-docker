@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: matrix-synapse
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://ananace.gitlab.io/charts
+      chart: matrix-synapse
+      targetRevision: 3.12.35
+      helm:
+        valueFiles:
+          - $values/k8s/apps/matrix-synapse/values.yaml
+    - repoURL: git@github.com:acwilsondev/anarchy-pizza-docker.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: matrix
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

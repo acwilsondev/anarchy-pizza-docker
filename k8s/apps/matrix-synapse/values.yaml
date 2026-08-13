@@ -1,0 +1,74 @@
+serverName: anarchy.pizza
+publicServerName: matrix.anarchy.pizza
+
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+
+externalPostgresql:
+  host: matrix-postgresql
+  username: synapse
+  database: synapse
+  existingSecret: matrix-postgres-secrets
+  existingSecretPasswordKey: POSTGRES_PASSWORD
+
+externalRedis:
+  host: matrix-redis
+  existingSecret: matrix-redis-secrets
+  existingSecretPasswordKey: VALKEY_PASSWORD
+
+config:
+  reportStats: false
+  enableRegistration: false
+  # registrationSharedSecret / macaroonSecretKey left unset - chart
+  # auto-generates fresh random values, matching "fresh state for now,
+  # real data migrated later" for this pass.
+
+# Federation stays fully disabled - the actual point of this whole app,
+# not a migration nicety. Belt-and-suspenders, mirroring the Compose
+# homeserver.yaml exactly:
+#   - send_federation/federation_domain_whitelist/allow_public_rooms_*
+#     go in cleanly via extraConfig (plain top-level keys).
+#   - The chart's own `listeners` block hardcodes
+#     `resources: [names: [client, federation]]` on the main port with
+#     NO values-level way to change it - confirmed by rendering the
+#     chart's actual output, not assumed. Overriding `listeners` here
+#     works because extraConfig is appended as a second `listeners:` key
+#     in the same homeserver.yaml document, and Synapse's YAML loader
+#     (PyYAML) takes the *last* value for a duplicate top-level key -
+#     verified this actually lands in the rendered ConfigMap before
+#     trusting it. Re-verify against the running pod's actual behavior
+#     after deploy (hitting /_matrix/federation/v1/version), not just
+#     the rendered config.
+extraConfig:
+  send_federation: false
+  federation_domain_whitelist: []
+  allow_public_rooms_without_auth: false
+  allow_public_rooms_over_federation: false
+  listeners:
+    - port: 8008
+      tls: false
+      bind_addresses: ["::"]
+      type: http
+      x_forwarded: true
+      resources:
+        - names:
+            - client
+          compress: false
+
+ingress:
+  enabled: false
+
+synapse:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 1024Mi
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 5Gi

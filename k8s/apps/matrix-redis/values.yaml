@@ -1,0 +1,27 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: valkey/valkey
+          tag: 9-alpine
+        args:
+          - sh
+          - -c
+          - "valkey-server --requirepass \"$VALKEY_PASSWORD\""
+        envFrom:
+          - secretRef:
+              name: matrix-redis-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      redis:
+        port: 6379
