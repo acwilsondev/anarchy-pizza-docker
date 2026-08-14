@@ -1,0 +1,32 @@
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: ghcr.io/acwilsondev/vikunja-tagger
+          tag: latest
+          pullPolicy: Always
+        env:
+          # In-cluster service DNS - both vikunja and webui (which bundles
+          # Ollama in the same pod, see k8s/apps/webui) are only reachable
+          # this way, no Traefik/Authelia involved on either side of this
+          # worker. See k8s/apps/vikunja-tagger/SETUP.md.
+          VIKUNJA_URL: "http://vikunja.vikunja.svc.cluster.local:3456"
+          OLLAMA_URL: "http://webui.webui.svc.cluster.local:11434"
+          OLLAMA_MODEL: "llama3.1:latest"
+        envFrom:
+          - secretRef:
+              name: vikunja-tagger-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 8000

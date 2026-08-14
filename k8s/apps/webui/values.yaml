@@ -28,6 +28,10 @@ service:
     ports:
       http:
         port: 8080
+      # Published so vikunja-tagger (k8s/apps/vikunja-tagger) can reach
+      # Ollama cross-namespace at webui.webui.svc.cluster.local:11434.
+      ollama:
+        port: 11434
 
 persistence:
   ollama:

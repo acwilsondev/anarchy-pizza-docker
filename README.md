@@ -123,6 +123,7 @@ All apps below are **live in k3s** (see `k8s/apps/<app>/`); the `apps/` director
 | Calibre-web | `library.${DOMAIN}` | Header-auth SSO |
 | Open WebUI | `llm.${DOMAIN}` | Header-auth SSO |
 | Vikunja | `vikunja.${DOMAIN}` | Native OIDC |
+| vikunja-tagger | — (internal only, no ingress) | — (source: [acwilsondev/vikunja-tagger](https://github.com/acwilsondev/vikunja-tagger); webhook worker, auto-labels new Vikunja tasks via Ollama — see `k8s/apps/vikunja-tagger/SETUP.md`) |
 | Homarr | `homarr.${DOMAIN}` | Native OIDC |
 | Vaultwarden | `vault.${DOMAIN}` | None yet (candidate) |
 | Matrix (Synapse) | `matrix.${DOMAIN}` | Native OIDC (Authelia) + native Synapse accounts (registration closed, admin-created) side by side |
