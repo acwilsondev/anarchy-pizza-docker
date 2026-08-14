@@ -16,6 +16,12 @@ controllers:
           VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID: vikunja
           VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_SCOPE: "openid profile email"
           VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_EMAILFALLBACK: "true"
+          # Vikunja's SSRF guard blocks outgoing requests (webhooks included)
+          # to private IP ranges by default, which also blocks its own
+          # in-cluster webhook deliveries (ClusterIPs are 10.0.0.0/8). Safe
+          # to relax here since this is a single-user instance - see
+          # k8s/apps/vikunja-tagger/SETUP.md.
+          VIKUNJA_OUTGOINGREQUESTS_ALLOWNONROUTABLEIPS: "true"
         envFrom:
           - secretRef:
               name: vikunja-secrets
