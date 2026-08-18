@@ -14,7 +14,12 @@ controllers:
           # <release>-<release>-<key> here, not a plain override - verified
           # against the actual Service object rather than assumed.
           SEARXNG_VALKEY_URL: redis://searxng-searxng-valkey:6379/0
-          SEARXNG_LIMITER: "true"
+          # Off for now: the limiter's botdetection requires a reverse proxy
+          # setting X-Forwarded-For/X-Real-IP. Not exposed via ingress yet,
+          # so Open WebUI's in-cluster requests hit no such proxy and were
+          # getting blanket-rejected with 429 Too Many Requests. Re-enable
+          # once this is exposed publicly behind a proxy at the real cutover.
+          SEARXNG_LIMITER: "false"
         envFrom:
           - secretRef:
               name: searxng-secret
