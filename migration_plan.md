@@ -89,7 +89,7 @@ a working rollback available at every step:
    everything gated behind it.
 5. Cut public traffic over only once every app is validated in k8s,
    keeping the Compose stack as an instant rollback the whole time —
-   same posture used keeping `apps/npm`'s compose file and data around
+   same posture used keeping `archived/npm`'s compose file and data around
    after the Traefik cutover.
 
 ## Status as of 2026-08-13
