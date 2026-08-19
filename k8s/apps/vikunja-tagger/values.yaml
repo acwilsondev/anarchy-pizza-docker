@@ -4,8 +4,8 @@ controllers:
       main:
         image:
           repository: ghcr.io/acwilsondev/vikunja-tagger
-          tag: latest
-          pullPolicy: Always
+          tag: "633774a9b2c981b71a5c47a6be093e7873b16579"
+          pullPolicy: IfNotPresent
         env:
           # In-cluster service DNS - both vikunja and webui (which bundles
           # Ollama in the same pod, see k8s/apps/webui) are only reachable
