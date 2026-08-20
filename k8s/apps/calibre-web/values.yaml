@@ -4,7 +4,7 @@ controllers:
       main:
         image:
           repository: lscr.io/linuxserver/calibre-web
-          tag: latest
+          tag: 0.6.27-ls397
         env:
           PUID: "1000"
           PGID: "1000"

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Denver",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "docker-compose": {
+    "fileMatch": ["^apps/[^/]+/docker-compose\\.ya?ml$"]
+  },
+  "helm-values": {
+    "fileMatch": ["^k8s/apps/[^/]+/values\\.yaml$"]
+  },
+  "packageRules": [
+    {
+      "description": "Everything opens a PR for manual review - nothing auto-merges.",
+      "matchManagers": ["docker-compose", "helm-values"],
+      "automerge": false
+    },
+    {
+      "description": "vikunja-tagger's tag is a commit SHA set by its own CI pipeline, not a version Renovate should try to bump.",
+      "matchManagers": ["helm-values"],
+      "matchPackageNames": ["ghcr.io/acwilsondev/vikunja-tagger"],
+      "enabled": false
+    }
+  ]
+}

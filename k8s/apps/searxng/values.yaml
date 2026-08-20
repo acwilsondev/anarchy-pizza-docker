@@ -4,7 +4,7 @@ controllers:
       main:
         image:
           repository: searxng/searxng
-          tag: latest
+          tag: 2026.8.20-487d7a96e
         env:
           TZ: America/Denver
           # Not exposed publicly yet - placeholder until the real cutover
