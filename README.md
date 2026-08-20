@@ -51,36 +51,12 @@ See `migration_plan.md` for the full history of how this stack got here — ever
 
 ## 🏗️ Architecture Overview
 
-### Request path
-```
-Internet → Traefik (public TLS via Let's Encrypt/cert-manager, ports 80/443)
-              → CrowdSec bouncer (shared Middleware, referenced from every IngressRoute)
-                  → Authelia (forward-auth or OIDC, as needed)
-                      → the app
-```
-Traefik owns the public edge directly and terminates TLS itself, via a `Certificate`/`ClusterIssuer` through cert-manager rather than Traefik's own built-in ACME resolver (running both against the same domains would race each other). Every app is reachable only through Traefik — an app with a leftover direct `NodePort`/`hostPort` bypasses Authelia entirely (see the Security Notes below; this bit the old Compose stack in practice, more than once, and is an explicit thing to check on any new app).
+Broken out by topic under `docs/architecture/`:
 
-**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`k8s/apps/crowdsec/`) reads pod logs natively through the Kubernetes API (its own DaemonSet-based acquisition) and feeds ban decisions to a shared Traefik `Middleware` referenced from every app's `IngressRoute` — every router gets it automatically. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI).
-
-### Single sign-on: three patterns, by what the app supports
-Authelia is backed by LLDAP (LDAP identity store, cluster-internal only, reachable for administration via `kubectl port-forward` or the Tailscale Kubernetes Operator — never exposed on the public Traefik path) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
-
-| Pattern | How it works | Apps using it |
-|---|---|---|
-| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG |
-| **Header-auth SSO** | Authelia forwards a trusted header (`Remote-User`/`Remote-Email`); the app trusts it directly — real single login | FreshRSS, Calibre-web, Open WebUI |
-| **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts — see `k8s/apps/matrix-synapse/values.yaml`) |
-
-Access is role-based via two LDAP groups — `admins` (full access) and `users` (deny-listed from a few apps) — not per-app allow-lists.
-
-Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, not yet wired up — it is on Traefik/TLS now, just not behind Authelia), and **LLDAP** (internal-only by design, see above).
-
-### Storage tiers
-- `local-path-provisioner` PVCs for small/medium app state (databases, configs).
-- `hostPath` straight at the physical bulk-storage disk for large data that needs to stay off the OS/root volume (Calibre-web's book library, Open WebUI's Ollama models).
-
-### Monitoring
-Dozzle gives real-time logs for every container in a web UI — behind SSO at `https://dozzle.${DOMAIN}`, not on a public port.
+- [Request path and edge protection](docs/architecture/request-path-and-edge-protection.md) — Traefik → CrowdSec → Authelia → app, and how TLS termination and edge banning actually work.
+- [Single sign-on](docs/architecture/single-sign-on.md) — the three SSO patterns apps use (forward-auth, header-auth, native OIDC), and which apps use which.
+- [Storage tiers](docs/architecture/storage-tiers.md) — `local-path-provisioner` PVCs vs. `hostPath` for bulk data.
+- [Monitoring](docs/architecture/monitoring.md) — Dozzle.
 
 ## 📦 Current Apps
 
@@ -103,7 +79,7 @@ All apps below are live in k3s (`k8s/apps/<app>/`), each its own Argo CD child `
 | Element Web | `chat.${DOMAIN}` | — (client only; auth happens against Synapse) |
 | LLDAP | internal-only (cluster + Tailscale) | — (identity backend) |
 | Traefik | — | — (the proxy layer itself; owns public TLS directly) |
-| CrowdSec | — (internal LAPI only) | — (edge protection layer for every app above; see Architecture Overview) |
+| CrowdSec | — (internal LAPI only) | — (edge protection layer for every app above; see [Request path and edge protection](docs/architecture/request-path-and-edge-protection.md)) |
 
 For the full blow-by-blow of how this stack got here — every gotcha, every bug, every decision and why, across both the original Compose-era SSO rollout and the later Compose→Kubernetes migration — see **`migration_plan.md`**. A working log, not a polished doc, but the ground truth for anything not obvious from the manifests themselves.
 
@@ -114,7 +90,7 @@ Individual production incidents (real outages, root cause, fix, follow-up) are w
 - **Check for leftover direct `NodePort`/`hostPort` exposure when adding a new app.** Traefik reaches every app over the cluster network by Service name — a host port bypasses Authelia entirely regardless of how well the SSO side is configured. This bit the old Compose stack for real (Dozzle, Uptime Kuma, Calibre-web) and is worth checking on every new app's manifest.
 - **Header-auth apps must never be reachable except through Traefik.** Trusting a `Remote-User`-style header means anyone who can reach the app's Service directly can forge it.
 - **LLDAP's admin UI is intentionally never exposed publicly** — it manages every account in the system, including Authelia's own. It's reachable only cluster-internally or over the tailnet.
-- Real secrets (LDAP bind passwords, OIDC client secrets, encryption keys) are applied directly to the cluster and are **not** committed to git — no SOPS/Sealed Secrets yet, so secret rotation is still an imperative, `kubectl`-driven step (see `migration_plan.md`'s "Known blockers" section).
+- Real secrets (LDAP bind passwords, OIDC client secrets, encryption keys) are applied directly to the cluster and are **not** committed to git — no SOPS/Sealed Secrets yet, so secret rotation is still an imperative, `kubectl`-driven step (see `docs/architecture_record/2026-08-13-close-out-known-blockers.md`).
 - A pre-commit hook (`.githooks/pre-commit`, enabled via `git config core.hooksPath .githooks`) runs [gitleaks](https://github.com/gitleaks/gitleaks) against staged changes and blocks the commit if it finds anything secret-shaped. Requires `gitleaks` on `PATH` (`sudo apt install gitleaks`, or see the linked install docs) — the hook refuses to commit unscanned if it's missing. Bypass with `git commit --no-verify` only for confirmed false positives.
 - **CrowdSec is edge protection, not an auth replacement.** It bans IPs after they trip a scenario (repeated failed logins, scanning, known-bad community IPs) — it doesn't gate access the way Authelia does. Apps not yet behind Authelia (Vaultwarden) still need their own login to actually be strong; CrowdSec just makes brute-forcing it much more expensive.
 
