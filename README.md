@@ -1,117 +1,90 @@
-# Home Lab Docker Reference
+# Home Lab Kubernetes Reference
 
-This repository is a curated collection of Docker Compose configurations for various self-hosted applications. It's designed as a "Reference Architecture" to help friends and fellow enthusiasts set up a robust, portable, and easily maintainable home server stack — including a full single sign-on layer, not just individual apps.
+This repository is a curated GitOps reference for a self-hosted home server stack running on k3s — including a full single sign-on layer, not just individual apps. It's meant to help friends and fellow enthusiasts set up a robust, portable, and easily maintainable home server without hand-running commands against a live host.
 
-**As of 2026-08-13, the live stack runs on k3s, not Docker Compose.** Every app in the table below was migrated to Kubernetes (Helm charts, Argo CD GitOps sync) — see `k8s/README.md` for the k8s-side layout and `migration_plan.md` for the full migration story, every real bug hit along the way, and why. The Docker Compose configs below remain fully intact and documented (every app's `docker-compose.yml`, its own `.env.example`, real data on disk) as an instant rollback path — `docker compose up -d` in any `apps/<app>/` brings that app's old Compose version back — but Compose itself is not the live path anymore, and the sections below describe how the stack *used to* run day-to-day, not how it runs now. Everything from **Architecture Overview** onward (SSO patterns, storage tiers, security posture) still applies conceptually; only the actual runtime (Compose → k3s) changed.
+**The stack runs on k3s (Helm charts, Argo CD GitOps sync)** — see `k8s/README.md` for the directory layout and `migration_plan.md` for the full migration story, every real bug hit along the way, and why. This repo previously also carried a parallel Docker Compose reference (every app's `docker-compose.yml`, its own `.env.example`) as a rollback path from the k3s cutover; once the cutover was proven stable, that Compose scaffolding was removed from the tree (2026-08-20 repo cleanup) — it's still recoverable from git history if ever needed, but is no longer maintained or kept in sync with the live config.
 
 ## ✨ Key Features
 
-- **Standardized Structure**: Each app lives in its own directory with its own `docker-compose.yml`.
-- **Portable Storage**: All host paths are externalized via variables (`STORAGE_ROOT`, `MEDIA_ROOT`).
-- **Zero-Downtime Updates**: A custom script updates containers only when new images or config changes are detected.
-- **Direct Reverse Proxy**: Traefik owns the public edge directly — Docker-label routing plus automatic Let's Encrypt TLS, no separate proxy-manager UI in the loop.
+- **GitOps**: Argo CD watches `k8s/apps/` and syncs the cluster to match — desired state lives in git, drift is visible, no hand-run `kubectl apply` for day-to-day changes.
+- **Standardized Structure**: Each app lives in its own directory under `k8s/apps/`, either a Helm chart + values file or plain manifests, with its own Argo CD `Application`.
+- **Direct Reverse Proxy**: Traefik owns the public edge directly — Ingress-based routing plus automatic Let's Encrypt TLS via cert-manager, no separate proxy-manager UI in the loop.
 - **Single Sign-On**: [Authelia](https://www.authelia.com/) gates every app that supports it, backed by [LLDAP](https://github.com/lldap/lldap) as the LDAP identity source — one login, one set of credentials, real group-based roles (`admins` / `users`).
 - **Centralized Logging**: Includes **Dozzle** for a unified web-based view of all container logs (behind SSO, not on a public port).
-- **Hardened Configs**: Resource limits, healthchecks, and no unnecessary direct host ports on anything that's routed through the proxy chain.
+- **Hardened Configs**: Resource limits, readiness/liveness probes, and no unnecessary direct host ports on anything that's routed through the proxy chain.
 
 ## 🛠️ Prerequisites
 
-- **Docker Engine + Docker Compose v2**: Ensure you have the modern `docker compose` plugin installed.
-- **Linux Environment**: Designed for Ubuntu/Debian, but adaptable to any system running Docker.
+- **A k3s (or compatible single-node Kubernetes) host**, Helm, and Argo CD installed — see `migration_plan.md` for the exact toolchain and bootstrap order this reference followed.
 - **A real domain with DNS you control**: needed for Let's Encrypt certs on any public-facing app.
-- **Basic Terminal Knowledge**: You'll need to be comfortable editing `.env` files and running scripts.
-- **(Optional) [Tailscale](https://tailscale.com/)**: this reference keeps LLDAP's admin UI off the public internet entirely, reachable only over a tailnet.
+- **Basic Kubernetes/Helm knowledge**: you'll need to be comfortable reading `values.yaml` files and Argo CD `Application` manifests.
+- **(Optional) [Tailscale](https://tailscale.com/)**: this reference keeps LLDAP's admin UI off the public internet entirely, reachable only over a tailnet (via the Tailscale Kubernetes Operator).
 
 ## 🚀 Getting Started
 
-**For the current live deployment (k3s):** see `k8s/README.md` for the directory layout and `migration_plan.md` for the full setup story. Broad strokes: k3s + Helm + Argo CD, one Argo CD `Application` per app under `k8s/apps/`, auto-synced from this repo. There's no separate "run this to deploy" script — pushing to `main` is the deploy mechanism.
+There's no separate "run this to deploy" script — pushing to `main` is the deploy mechanism, once Argo CD is bootstrapped.
 
-The steps below describe the **Docker Compose path** — still fully functional as a rollback, and the reference for what each app's k3s config mirrors, but not how the live stack actually runs day-to-day anymore.
+### 1. Clone
 
-### 1. Clone and Initialize
 ```bash
-git clone https://github.com/your-username/homelab-docker.git
-cd homelab-docker
+git clone https://github.com/your-username/homelab.git
+cd homelab
 ```
 
-### 2. Configure Your Environment
-Copy the example environment file and edit it to match your host system's paths and domain:
-```bash
-cp .env.example .env
-nano .env
-```
-*   Set `STORAGE_ROOT` to where you want app data (configs, DBs) to live.
-*   Set `MEDIA_ROOT` to your media library path.
-*   Set `DOMAIN` to your real base domain (e.g. `example.com`) — every Traefik-routed app hangs a subdomain off this (`dozzle.example.com`, `auth.example.com`, etc).
+### 2. Stand up k3s, Helm, and Argo CD
 
-Some apps also need their own `.env` — copy each `apps/<app>/.env.example` to `apps/<app>/.env` and fill it in before starting that app.
+Not scripted here — a single-node k3s install plus Helm and Argo CD, following `migration_plan.md`'s toolchain notes. `k3s`'s bundled Traefik/ServiceLB should stay disabled if you're using this repo's own Traefik deployment (`k8s/apps/traefik/`) to avoid a port 80/443 conflict.
 
-### 3. Bootstrap the Network
-Run the bootstrap script to create the shared `homelab` network:
+### 3. Bootstrap Argo CD's root app
+
 ```bash
-bash bootstrap.sh
+kubectl apply -f k8s/argocd/root-app.yaml
 ```
 
-### 4. Deploy Applications
-You can start apps individually or all at once.
+This is the one manual step — an app-of-apps root `Application` that watches `k8s/apps/` on `main` and auto-syncs (with prune + self-heal) everything under it from then on.
 
-**To start a specific app** (both env files, root + the app's own, matter):
-```bash
-cd apps/dozzle
-docker compose --env-file ../../.env --env-file .env up -d
-```
+### 4. Point DNS at your server
 
-**To update and start everything:**
-```bash
-bash update-all-apps.sh
-```
+Every subdomain used by a Traefik-routed app (`dozzle.${DOMAIN}`, `auth.${DOMAIN}`, etc) needs an A/AAAA record pointing at your server's public IP. Traefik + cert-manager handle TLS automatically (Let's Encrypt, HTTP-01) once a `Certificate`/`ClusterIssuer` and DNS are both in place — see `k8s/apps/ingress/certificate.yaml`. A new app just needs the right `IngressRoute` and correct DNS; the certificate covers it via a shared multi-SAN cert and `TLSStore`.
 
-### 5. Point DNS at your server
-Every subdomain used by a Traefik-labeled app (`dozzle.${DOMAIN}`, `auth.${DOMAIN}`, etc) needs an A/AAAA record pointing at your server's public IP. Traefik handles TLS itself now (Let's Encrypt, HTTP-01) — no manual proxy-host setup needed per app, unlike earlier versions of this stack that chained through Nginx Proxy Manager. A new app just needs `traefik.enable=true` labels and correct DNS; the certificate is issued automatically on first request.
-
-See `archived/migration_plan.md` for the full history of how this pattern evolved, every gotcha hit along the way, and the NPM→Traefik cutover itself (including a live incident worth reading before touching a shared router's TLS config). A new `migration_plan.md` now tracks the in-progress Kubernetes/Helm/Argo CD migration.
+See `migration_plan.md` for the full history of how this stack got here — every gotcha hit along the way, both the original NPM→Traefik cutover on Compose and the later Compose→k3s migration.
 
 ## 🏗️ Architecture Overview
 
 ### Request path
 ```
-Internet → Traefik (public TLS via Let's Encrypt, ports 80/443)
-              → CrowdSec bouncer (entrypoint-level middleware, every router)
+Internet → Traefik (public TLS via Let's Encrypt/cert-manager, ports 80/443)
+              → CrowdSec bouncer (shared Middleware, referenced from every IngressRoute)
                   → Authelia (forward-auth or OIDC, as needed)
                       → the app
 ```
-Traefik owns the public edge directly and terminates TLS itself (Let's Encrypt, HTTP-01) — in the current k3s deployment, via a `Certificate`/`ClusterIssuer` through cert-manager rather than Traefik's own built-in ACME resolver (which the Compose version used); running both against the same domains would race each other. Nginx Proxy Manager, which used to sit in front of Traefik doing this job, has been fully retired — its compose file and data are kept on disk as an instant rollback path (`docker compose up -d` in `archived/npm`), but it is not running. Every app is reachable only through Traefik otherwise — removing an app's leftover direct host port is a standard, expected step when migrating it onto this pattern (see the Security Notes below; this bit us in practice, more than once).
+Traefik owns the public edge directly and terminates TLS itself, via a `Certificate`/`ClusterIssuer` through cert-manager rather than Traefik's own built-in ACME resolver (running both against the same domains would race each other). Every app is reachable only through Traefik — an app with a leftover direct `NodePort`/`hostPort` bypasses Authelia entirely (see the Security Notes below; this bit the old Compose stack in practice, more than once, and is an explicit thing to check on any new app).
 
-**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`apps/crowdsec/`, Compose version — see `k8s/apps/` for the running k3s version) reads Traefik's and Vaultwarden's logs and feeds ban decisions to a Traefik plugin applied per-router (in k3s, via a shared `Middleware` referenced from every app's `IngressRoute` — functionally the same "every router gets it automatically" outcome as the Compose entrypoint-level config). The k3s version reads pod logs natively through the Kubernetes API (its own DaemonSet-based acquisition) rather than a Docker-socket mount. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI). See `apps/crowdsec/SETUP.md` for the original Compose (one-time, order-dependent) bootstrap.
+**Edge protection**: [CrowdSec](https://www.crowdsec.net/) (`k8s/apps/crowdsec/`) reads pod logs natively through the Kubernetes API (its own DaemonSet-based acquisition) and feeds ban decisions to a shared Traefik `Middleware` referenced from every app's `IngressRoute` — every router gets it automatically. It runs ahead of Authelia's own login-form brute-force protection and is the only thing guarding apps that don't sit behind Authelia yet (Vaultwarden). Enrolled in CrowdSec's community blocklist (CAPI).
 
 ### Single sign-on: three patterns, by what the app supports
-Authelia is backed by LLDAP (LDAP identity store, never exposed publicly — Tailscale-only in the old Compose setup; in k3s, cluster-internal only via `kubectl port-forward`, arguably even stricter, though real tailnet access to the admin UI isn't wired up yet, see `migration_plan.md`) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
+Authelia is backed by LLDAP (LDAP identity store, cluster-internal only, reachable for administration via `kubectl port-forward` or the Tailscale Kubernetes Operator — never exposed on the public Traefik path) and is itself also configured as an OIDC provider. Which pattern an app gets depends on what it natively supports:
 
 | Pattern | How it works | Apps using it |
 |---|---|---|
-| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG, Friendica (here for a different reason — see below) |
+| **Forward-auth gate** | Traefik calls Authelia before every request; the app itself has no auth (or its own login is disabled) | Dozzle, Uptime Kuma, SearXNG |
 | **Header-auth SSO** | Authelia forwards a trusted header (`Remote-User`/`Remote-Email`); the app trusts it directly — real single login | FreshRSS, Calibre-web, Open WebUI |
-| **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts - see `apps/matrix/SETUP.md`) |
+| **Native OIDC** | The app talks to Authelia's OIDC endpoints itself; no forward-auth middleware needed | Vikunja, Homarr, Matrix (alongside native accounts — see `k8s/apps/matrix-synapse/values.yaml`) |
 
 Access is role-based via two LDAP groups — `admins` (full access) and `users` (deny-listed from a few apps) — not per-app allow-lists.
 
 Apps not yet on this pattern: **Vaultwarden** (has its own native OIDC support, not yet wired up — it is on Traefik/TLS now, just not behind Authelia), and **LLDAP** (internal-only by design, see above).
 
-**Friendica** (staged in `wip/`, not yet deployed) is a special case: it's on the forward-auth gate not as a login mechanism but as a federation kill switch. It's a federated (ActivityPub) app with no in-app way to disable federation, so the Authelia gate — sitting in front of every path, including `/inbox` and `/.well-known/webfinger` — is what will keep it unreachable by other servers once it's deployed. See `wip/friendica/SETUP.md` for the full reasoning and how to go public/federated later.
-
 ### Storage tiers
-- `gold/`: Fast storage (SSD/NVMe) for databases and high-IO apps.
-- `silver/`: Standard storage for general app configs — also where every app's non-git secrets live (`${STORAGE_ROOT}/silver/<app>/secrets/`).
-- `bronze/`: Bulk storage for less sensitive or large data.
+- `local-path-provisioner` PVCs for small/medium app state (databases, configs).
+- `hostPath` straight at the physical bulk-storage disk for large data that needs to stay off the OS/root volume (Calibre-web's book library, Open WebUI's Ollama models).
 
 ### Monitoring
-Dozzle gives real-time logs for every container in a web UI — behind SSO at `https://dozzle.${DOMAIN}`, not on a public port. (An earlier version of this stack had it on a bare host port with zero auth; don't do that.)
+Dozzle gives real-time logs for every container in a web UI — behind SSO at `https://dozzle.${DOMAIN}`, not on a public port.
 
 ## 📦 Current Apps
 
-All apps below are **live in k3s** (see `k8s/apps/<app>/`); the `apps/` directory referenced throughout this table is the Docker Compose reference/rollback config each k3s app was migrated from, not the running instance.
-
-**Active** (`apps/`):
+All apps below are live in k3s (`k8s/apps/<app>/`), each its own Argo CD child `Application` under the app-of-apps root.
 
 | App | Public URL | Auth |
 |---|---|---|
@@ -128,37 +101,24 @@ All apps below are **live in k3s** (see `k8s/apps/<app>/`); the `apps/` director
 | Vaultwarden | `vault.${DOMAIN}` | None yet (candidate) |
 | Matrix (Synapse) | `matrix.${DOMAIN}` | Native OIDC (Authelia) + native Synapse accounts (registration closed, admin-created) side by side |
 | Element Web | `chat.${DOMAIN}` | — (client only; auth happens against Synapse) |
-| LLDAP | internal-only (Tailscale) | — (identity backend) |
+| LLDAP | internal-only (cluster + Tailscale) | — (identity backend) |
 | Traefik | — | — (the proxy layer itself; owns public TLS directly) |
-| CrowdSec | — (internal LAPI only, `crowdsec:8080`) | — (edge protection layer for every app above; see Architecture Overview) |
+| CrowdSec | — (internal LAPI only) | — (edge protection layer for every app above; see Architecture Overview) |
 
-**Work in progress** (`wip/`) — staged, not deployed; `update-all-apps.sh` only walks `apps/`, so these are inert until moved:
-- **Friendica** (`wip/friendica/`) — planned at `friendica.${DOMAIN}`, forward-auth gate (federation intentionally off until it's moved to `apps/` — see `wip/friendica/SETUP.md`).
-
-**Archived** (`archived/`) — retired or replaced, compose files kept for reference, data intentionally left on disk rather than deleted:
-- **Nginx Proxy Manager (NPM)** → fully retired once Traefik took over public TLS/routing directly. Kept as an instant rollback path (`docker compose up -d` in `archived/npm`), not deleted.
-- **Portainer** — decommissioned by choice, not part of the active stack.
-- **CommaFeed** → replaced by FreshRSS (no viable SSO path existed for CommaFeed).
-- **MinIO** → its open-source Console SSO was removed upstream by the vendor (and the project's GitHub repo was later archived entirely); no direct replacement currently running.
-- **RustFS** → attempted MinIO replacement; abandoned after real, unresolved OIDC and data-durability bugs surfaced in the beta software.
-- A handful of others (`bandcampsync`, `nextcloud`, `qbittorrentvpn`) predate the SSO rollout — see git history for context on each.
-- **n8n**, tried twice, retired both times — not by bug, by choice (workflow-builder UX wasn't a fit for this stack's admin). `archived/n8n` is the original pre-SSO attempt (direct host port, queue mode with a separate worker + Redis, no Traefik/Authelia). `archived/n8n-sso` is the later, fully-working redo (forward-auth gate via Authelia admins-only, webhook/form-trigger paths deliberately bypassing the gate since external callers can't do a login redirect, single container - queue mode was overkill for a single-node homelab). See git history around 2026-08-13 for the full Traefik-priority and Authelia-session debugging that went into `n8n-sso`.
-- **`archived/matrix`** — an earlier, incomplete Matrix attempt (dead config, never actually deployed — see its own history for the DB-password lesson learned). Superseded by the working `apps/matrix` + `apps/element-web`, deliberately kept off the SSO pattern above and fully non-federated by design. See `apps/matrix/SETUP.md`.
-
-For the full blow-by-blow — every gotcha, every bug, every decision and why — see **`archived/migration_plan.md`** (Traefik/Authelia SSO rollout) and **`migration_plan.md`** (in-progress Kubernetes/Helm/Argo CD migration). Working logs, not polished docs, but the ground truth for anything not obvious from the compose files themselves.
+For the full blow-by-blow of how this stack got here — every gotcha, every bug, every decision and why, across both the original Compose-era SSO rollout and the later Compose→Kubernetes migration — see **`migration_plan.md`**. A working log, not a polished doc, but the ground truth for anything not obvious from the manifests themselves.
 
 ## 🔒 Security Notes
 
-- **Check for leftover host ports when migrating an app onto the Traefik/Authelia pattern.** An app that pre-dates this pattern usually still has a `ports:` entry from its old direct-NPM setup — leaving it in place means the app is reachable directly, bypassing Authelia entirely, regardless of how well the SSO side is configured. This happened for real (Dozzle, Uptime Kuma, Calibre-web) and is now an explicit step in `migration_plan.md`'s per-app checklist.
-- **Header-auth apps must never be reachable except through Traefik.** Trusting a `Remote-User`-style header means anyone who can reach the app directly can forge it.
-- **LLDAP's admin UI is intentionally never exposed publicly** — it manages every account in the system, including Authelia's own. It's bound to this host's Tailscale interface only.
-- Real secrets (LDAP bind passwords, OIDC client secrets, encryption keys) live host-only under `${STORAGE_ROOT}/silver/*/secrets/` and are **not** committed to git — only placeholder `.env.example` files are tracked.
-- A pre-commit hook (`.githooks/pre-commit`, wired up by `bootstrap.sh` via `core.hooksPath`) runs [gitleaks](https://github.com/gitleaks/gitleaks) against staged changes and blocks the commit if it finds anything secret-shaped. Requires `gitleaks` on `PATH` (`sudo apt install gitleaks`, or see the linked install docs) — the hook refuses to commit unscanned if it's missing. Bypass with `git commit --no-verify` only for confirmed false positives.
+- **Check for leftover direct `NodePort`/`hostPort` exposure when adding a new app.** Traefik reaches every app over the cluster network by Service name — a host port bypasses Authelia entirely regardless of how well the SSO side is configured. This bit the old Compose stack for real (Dozzle, Uptime Kuma, Calibre-web) and is worth checking on every new app's manifest.
+- **Header-auth apps must never be reachable except through Traefik.** Trusting a `Remote-User`-style header means anyone who can reach the app's Service directly can forge it.
+- **LLDAP's admin UI is intentionally never exposed publicly** — it manages every account in the system, including Authelia's own. It's reachable only cluster-internally or over the tailnet.
+- Real secrets (LDAP bind passwords, OIDC client secrets, encryption keys) are applied directly to the cluster and are **not** committed to git — no SOPS/Sealed Secrets yet, so secret rotation is still an imperative, `kubectl`-driven step (see `migration_plan.md`'s "Known blockers" section).
+- A pre-commit hook (`.githooks/pre-commit`, enabled via `git config core.hooksPath .githooks`) runs [gitleaks](https://github.com/gitleaks/gitleaks) against staged changes and blocks the commit if it finds anything secret-shaped. Requires `gitleaks` on `PATH` (`sudo apt install gitleaks`, or see the linked install docs) — the hook refuses to commit unscanned if it's missing. Bypass with `git commit --no-verify` only for confirmed false positives.
 - **CrowdSec is edge protection, not an auth replacement.** It bans IPs after they trip a scenario (repeated failed logins, scanning, known-bad community IPs) — it doesn't gate access the way Authelia does. Apps not yet behind Authelia (Vaultwarden) still need their own login to actually be strong; CrowdSec just makes brute-forcing it much more expensive.
 
 ## ⚠️ Disclaimer
 
-This is a **reference** repository reflecting a specific personal setup, including a real SSO/identity layer with real security implications — not a hardened, general-purpose product. Review every `docker-compose.yml` and the Security Notes above before deploying anything from here, especially the auth-related pieces.
+This is a **reference** repository reflecting a specific personal setup, including a real SSO/identity layer with real security implications — not a hardened, general-purpose product. Review every manifest under `k8s/apps/` and the Security Notes above before deploying anything from here, especially the auth-related pieces.
 
 ## 📄 License
 

@@ -18,6 +18,3 @@ Thumbs.db
 
 # Docker
 .docker
-
-# Runtime logs
-boot-watchdog.log

@@ -6,8 +6,9 @@ apps, one `docker-compose.yml` per app, manually applied via
 Helm-packaged apps and Argo CD doing GitOps sync — still one physical
 server, no multi-node HA — without tearing down the working Compose
 stack until each piece is proven, and without repeating the "no live
-impact" mistake from the NPM→Traefik cutover (see
-`archived/migration_plan.md`).
+impact" mistake from the NPM→Traefik cutover (see the pre-2026-08-20 git
+history for `archived/migration_plan.md`, removed from the tree in that
+cleanup along with the rest of the Docker Compose configs).
 
 ## Why
 
@@ -149,7 +150,8 @@ not worth the risk on this component; deviates from the toolchain note,
 worth revisiting with more research time before the real cutover).
 
 Verified end-to-end with the *exact same technique* already proven in
-`archived/migration_plan.md`'s incident history (`/api/firstfactor` then
+`archived/migration_plan.md`'s incident history (git history only now —
+see above; `/api/firstfactor` then
 `/api/verify` with the resulting session cookie), not just "pods are
 Running":
 - `kubectl exec ... /app/bootstrap.sh` output confirmed groups
@@ -275,7 +277,7 @@ passwords never needed to match production's).
 
 `identity_providers.oidc` added to the k3s Authelia's config (second
 `--config` file, same deep-merge pattern already proven in production —
-see `archived/migration_plan.md`), fresh `hmac_secret` + 4096-bit RSA
+see `archived/migration_plan.md` in git history), fresh `hmac_secret` + 4096-bit RSA
 key. Vikunja/Homarr/Matrix registered as clients, each with its own
 correct `token_endpoint_auth_method` (Vikunja/Matrix:
 `client_secret_post`, Homarr: `client_secret_basic` — not copy-pasted
@@ -360,5 +362,7 @@ self-signed.
   declarative. Worth solving properly before the next round of secret
   rotation or a second node ever enters the picture.
 
-Old Traefik/Authelia SSO rollout history archived to
-`archived/migration_plan.md`.
+Old Traefik/Authelia SSO rollout history lives in git history as
+`archived/migration_plan.md`, removed from the working tree in the
+2026-08-20 repo cleanup along with the rest of the Docker Compose configs
+it documents.

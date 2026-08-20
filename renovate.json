@@ -5,16 +5,13 @@
   "schedule": ["before 6am on monday"],
   "prConcurrentLimit": 5,
   "labels": ["dependencies"],
-  "docker-compose": {
-    "fileMatch": ["^apps/[^/]+/docker-compose\\.ya?ml$"]
-  },
   "helm-values": {
     "fileMatch": ["^k8s/apps/[^/]+/values\\.yaml$"]
   },
   "packageRules": [
     {
       "description": "Everything opens a PR for manual review - nothing auto-merges.",
-      "matchManagers": ["docker-compose", "helm-values"],
+      "matchManagers": ["helm-values"],
       "automerge": false
     },
     {
