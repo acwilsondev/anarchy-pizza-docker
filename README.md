@@ -18,7 +18,7 @@ This repository is a curated GitOps reference for a self-hosted home server stac
 - **A k3s (or compatible single-node Kubernetes) host**, Helm, and Argo CD installed — see `migration_plan.md` for the exact toolchain and bootstrap order this reference followed.
 - **A real domain with DNS you control**: needed for Let's Encrypt certs on any public-facing app.
 - **Basic Kubernetes/Helm knowledge**: you'll need to be comfortable reading `values.yaml` files and Argo CD `Application` manifests.
-- **(Optional) [Tailscale](https://tailscale.com/)**: this reference keeps LLDAP's admin UI off the public internet entirely, reachable only over a tailnet (via the Tailscale Kubernetes Operator).
+- **(Optional) [Tailscale](https://tailscale.com/)**: this reference keeps LLDAP's admin UI and the Argo CD UI off the public internet entirely, reachable only over a tailnet (via the Tailscale Kubernetes Operator).
 
 ## 🚀 Getting Started
 
@@ -27,8 +27,8 @@ There's no separate "run this to deploy" script — pushing to `main` is the dep
 ### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/homelab.git
-cd homelab
+git clone https://github.com/your-username/homelab-docker.git
+cd homelab-docker
 ```
 
 ### 2. Stand up k3s, Helm, and Argo CD
@@ -106,6 +106,8 @@ All apps below are live in k3s (`k8s/apps/<app>/`), each its own Argo CD child `
 | CrowdSec | — (internal LAPI only) | — (edge protection layer for every app above; see Architecture Overview) |
 
 For the full blow-by-blow of how this stack got here — every gotcha, every bug, every decision and why, across both the original Compose-era SSO rollout and the later Compose→Kubernetes migration — see **`migration_plan.md`**. A working log, not a polished doc, but the ground truth for anything not obvious from the manifests themselves.
+
+Individual production incidents (real outages, root cause, fix, follow-up) are written up under **`incidents/`** as they happen — `migration_plan.md` links the ones that directly shaped a design decision, but the directory itself is the full list.
 
 ## 🔒 Security Notes
 
