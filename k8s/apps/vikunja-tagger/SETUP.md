@@ -29,6 +29,7 @@ this directly - Vikunja logged `prohibited IP address ... denied by:
 ## 3. Create a Vikunja API token
 
 In Vikunja: **Settings > API Tokens > Create**. Needs at minimum:
+
 - `labels:read`
 - `tasks:read`, `tasks:write` (to read task payloads and attach labels)
 

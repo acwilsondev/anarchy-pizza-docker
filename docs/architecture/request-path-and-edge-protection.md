@@ -1,6 +1,6 @@
 # Request path and edge protection
 
-```
+```text
 Internet → Traefik (public TLS via Let's Encrypt/cert-manager, ports 80/443)
               → CrowdSec bouncer (shared Middleware, referenced from every IngressRoute)
                   → Authelia (forward-auth or OIDC, as needed)

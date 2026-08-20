@@ -1,0 +1,10 @@
+{
+  "default": true,
+  // This repo's prose isn't hard-wrapped at a fixed column (README.md and
+  // migration_plan.md use long unwrapped lines; docs/ hand-wraps around
+  // ~80 but not strictly), so line-length would just be noise.
+  "MD013": false,
+  // Table pipe-padding consistency - newer, pedantic rule that would
+  // require reformatting every existing table for no readability gain.
+  "MD060": false
+}

@@ -1,12 +1,14 @@
 #!/bin/bash
-# Blocks commits containing secrets, using gitleaks against staged changes.
-# Enabled repo-wide via `git config core.hooksPath .githooks` (run once per
-# clone). To install gitleaks: `sudo apt install gitleaks`
-# or see https://github.com/gitleaks/gitleaks#installing
+# Blocks commits containing secrets (gitleaks) or lint-broken markdown
+# (markdownlint-cli2), both scoped to staged changes. Enabled repo-wide via
+# `git config core.hooksPath .githooks` (run once per clone).
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
+# --- secrets ---
+# To install gitleaks: `sudo apt install gitleaks`
+# or see https://github.com/gitleaks/gitleaks#installing
 if ! command -v gitleaks >/dev/null 2>&1; then
 	echo "pre-commit: gitleaks not found - refusing to commit unscanned." >&2
 	echo "  Install it: sudo apt install gitleaks" >&2
@@ -21,3 +23,17 @@ gitleaks protect \
 	--staged \
 	--redact \
 	--verbose
+
+# --- markdown lint ---
+mapfile -t staged_md < <(git diff --cached --name-only --diff-filter=ACM -- '*.md')
+
+if [ "${#staged_md[@]}" -gt 0 ]; then
+	if [ ! -x "$REPO_ROOT/node_modules/.bin/markdownlint-cli2" ]; then
+		echo "pre-commit: markdownlint-cli2 not installed - refusing to commit unscanned markdown." >&2
+		echo "  Install it: npm install" >&2
+		echo "  To bypass once, use: git commit --no-verify" >&2
+		exit 1
+	fi
+
+	"$REPO_ROOT/node_modules/.bin/markdownlint-cli2" "${staged_md[@]}"
+fi
