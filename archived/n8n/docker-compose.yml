@@ -6,8 +6,8 @@ volumes:
 networks:
   n8n-net:
     driver: bridge
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true
 
 x-shared: &shared
@@ -78,7 +78,7 @@ services:
   n8n:
     <<: *shared
     networks:
-      - anarchy-pizza
+      - homelab
       - n8n-net
     ports:
       - 5678:5678

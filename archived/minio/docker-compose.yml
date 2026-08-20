@@ -33,7 +33,7 @@ services:
       - traefik.http.routers.minio-console.entrypoints=web
       - traefik.http.services.minio-console.loadbalancer.server.port=9001
     networks:
-      - anarchy-pizza
+      - homelab
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -41,5 +41,5 @@ services:
       retries: 5
 
 networks:
-  anarchy-pizza:
+  homelab:
     external: true

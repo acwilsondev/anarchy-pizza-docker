@@ -27,9 +27,9 @@ services:
       - traefik.http.routers.vaultwarden.tls.certresolver=le
       - traefik.http.services.vaultwarden.loadbalancer.server.port=80
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

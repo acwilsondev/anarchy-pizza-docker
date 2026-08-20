@@ -10,7 +10,7 @@ services:
         limits:
           memory: 256M
     networks:
-      - anarchy-pizza
+      - homelab
 
   commafeed-postgresql:
     image: postgres:18
@@ -21,9 +21,9 @@ services:
     volumes:
       - ${STORAGE_ROOT}/silver/commafeed-postgresql:/var/lib/postgresql
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

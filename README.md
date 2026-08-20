@@ -1,4 +1,4 @@
-# Anarchy Pizza Docker Reference 🍕
+# Home Lab Docker Reference
 
 This repository is a curated collection of Docker Compose configurations for various self-hosted applications. It's designed as a "Reference Architecture" to help friends and fellow enthusiasts set up a robust, portable, and easily maintainable home server stack — including a full single sign-on layer, not just individual apps.
 
@@ -30,8 +30,8 @@ The steps below describe the **Docker Compose path** — still fully functional 
 
 ### 1. Clone and Initialize
 ```bash
-git clone https://github.com/your-username/anarchy-pizza-docker.git
-cd anarchy-pizza-docker
+git clone https://github.com/your-username/homelab-docker.git
+cd homelab-docker
 ```
 
 ### 2. Configure Your Environment
@@ -47,7 +47,7 @@ nano .env
 Some apps also need their own `.env` — copy each `apps/<app>/.env.example` to `apps/<app>/.env` and fill it in before starting that app.
 
 ### 3. Bootstrap the Network
-Run the bootstrap script to create the shared `anarchy-pizza` network:
+Run the bootstrap script to create the shared `homelab` network:
 ```bash
 bash bootstrap.sh
 ```

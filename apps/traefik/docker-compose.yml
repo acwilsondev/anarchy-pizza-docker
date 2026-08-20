@@ -7,7 +7,7 @@ services:
     command:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
-      - --providers.docker.network=anarchy-pizza
+      - --providers.docker.network=homelab
       # Internal NPM-facing entrypoint - unchanged, still used until NPM
       # is actually dropped (see migration_plan.md's NPM cutover plan).
       - --entrypoints.web.address=:8080
@@ -48,9 +48,9 @@ services:
         limits:
           memory: 256M
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

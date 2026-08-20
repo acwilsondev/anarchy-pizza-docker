@@ -34,7 +34,7 @@ services:
         limits:
           memory: 512M
     networks:
-      - anarchy-pizza
+      - homelab
 
   searxng-valkey:
     image: valkey/valkey:9-alpine
@@ -53,9 +53,9 @@ services:
         limits:
           memory: 128M
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

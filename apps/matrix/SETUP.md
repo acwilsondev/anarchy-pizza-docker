@@ -64,7 +64,7 @@ allow_public_rooms_over_federation: false
 There's also no `ports:` entry for 8448 (the federation port) anywhere in
 `docker-compose.yml`, and no Traefik router for it - so even if you ever
 re-add "federation" to the resources list above by mistake, nothing
-outside the `anarchy-pizza` Docker network can reach it.
+outside the `homelab` Docker network can reach it.
 
 **Point at Postgres instead of the default sqlite**, using the same
 credentials as `apps/matrix/.env`:
@@ -116,7 +116,7 @@ Web at `https://chat.${DOMAIN}` (see `apps/element-web/`).
 
 Same "Native OIDC" pattern Vikunja/Homarr use (see main README) - Synapse
 talks to Authelia's OIDC endpoints directly, no Traefik forward-auth
-middleware needed. `access_control`'s existing `*.anarchy.pizza` wildcard
+middleware needed. `access_control`'s existing `*.${DOMAIN}` wildcard
 rule already covers `matrix.${DOMAIN}`, so nothing to change there.
 
 **Register the client in Authelia** - append to the `clients:` list in
@@ -205,7 +205,7 @@ and only surface mid-login.
 Then `docker restart synapse`. Check it logs `Preloading OIDC provider
 'oidc-authelia'` and two `200`s fetching Authelia's discovery doc and
 JWKS - if either 404s or times out, double check `issuer` and that
-Authelia is actually reachable from the `anarchy-pizza` network.
+Authelia is actually reachable from the `homelab` network.
 
 **Important**: this does *not* replace closed registration/step 4's admin
 CLI flow, it adds to it - both work side by side. But SSO logins

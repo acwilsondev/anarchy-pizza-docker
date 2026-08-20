@@ -12,7 +12,7 @@ spec:
       helm:
         valueFiles:
           - $values/k8s/apps/calibre-web/values.yaml
-    - repoURL: git@github.com:acwilsondev/anarchy-pizza-docker.git
+    - repoURL: git@github.com:acwilsondev/homelab-docker.git
       targetRevision: main
       ref: values
   destination:

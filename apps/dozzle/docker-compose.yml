@@ -18,8 +18,8 @@ services:
       - traefik.http.routers.dozzle-secure.service=dozzle
       - traefik.http.routers.dozzle-secure.middlewares=authelia@docker
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
+  homelab:
     external: true

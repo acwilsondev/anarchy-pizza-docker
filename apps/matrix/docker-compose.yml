@@ -37,7 +37,7 @@ services:
         limits:
           memory: 1024M
     networks:
-      - anarchy-pizza
+      - homelab
 
   synapse-postgresql:
     image: postgres:18
@@ -58,9 +58,9 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

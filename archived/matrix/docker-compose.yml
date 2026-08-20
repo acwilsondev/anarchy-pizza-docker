@@ -11,9 +11,9 @@ services:
       - synapse-postgresql
     networks:
       - private
-      - anarchy-pizza
+      - homelab
     # Only publish if you are NOT using a reverse proxy.
-    # If you use Traefik/Caddy/Nginx on anarchy-pizza, you can omit ports entirely.
+    # If you use Traefik/Caddy/Nginx on homelab, you can omit ports entirely.
     # ports:
     #   - "8008:8008"
 
@@ -29,8 +29,8 @@ services:
       - private
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true
   private:
     driver: bridge

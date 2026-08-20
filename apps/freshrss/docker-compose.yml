@@ -7,7 +7,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRON_MIN=3,33
-      # Anarchy-pizza subnet - lets FreshRSS trust the Remote-User header
+      # Homelab subnet - lets FreshRSS trust the Remote-User header
       # forwarded by Authelia via Traefik (same subnet already trusted by
       # Traefik's forwardedHeaders and Authelia's session cookie chain).
       - TRUSTED_PROXY=172.25.0.0/16
@@ -32,9 +32,9 @@ services:
         limits:
           memory: 256M
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

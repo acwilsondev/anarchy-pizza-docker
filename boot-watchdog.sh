@@ -10,7 +10,7 @@
 #
 # Run a couple of minutes after boot via `@reboot` in cron (deliberately
 # not a systemd unit, so this needs no root):
-#   @reboot sleep 120 && /home/aaron/anarchy-pizza-docker/boot-watchdog.sh >> /home/aaron/anarchy-pizza-docker/boot-watchdog.log 2>&1
+#   @reboot sleep 120 && /home/aaron/homelab-docker/boot-watchdog.sh >> /home/aaron/homelab-docker/boot-watchdog.log 2>&1
 
 set -uo pipefail
 

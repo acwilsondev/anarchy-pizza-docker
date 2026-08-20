@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Create the shared external network if it doesn't exist
-docker network inspect anarchy-pizza >/dev/null 2>&1 || \
-docker network create anarchy-pizza
+docker network inspect homelab >/dev/null 2>&1 || \
+docker network create homelab
 
-echo "Prerequisites checked: 'anarchy-pizza' network is ready."
+echo "Prerequisites checked: 'homelab' network is ready."
 
 # Wire up the repo's tracked git hooks (secret-scanning pre-commit, via
 # gitleaks) - core.hooksPath isn't trusted from a clone automatically,

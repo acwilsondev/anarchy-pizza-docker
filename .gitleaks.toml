@@ -1,4 +1,4 @@
-title = "anarchy-pizza-docker gitleaks config"
+title = "homelab-docker gitleaks config"
 
 # Start from gitleaks' maintained default ruleset (AWS keys, GitHub/GitLab
 # tokens, generic high-entropy secrets/passwords, private keys, etc.) and

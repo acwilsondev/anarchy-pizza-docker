@@ -10,7 +10,7 @@ services:
       - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=Remote-Email
       - WEBUI_AUTH_TRUSTED_NAME_HEADER=Remote-Name
       # Ollama defaults to 127.0.0.1 only, unreachable from other
-      # containers (e.g. n8n) even on the shared anarchy-pizza network.
+      # containers (e.g. n8n) even on the shared homelab network.
       # Binding 0.0.0.0 is still internal-only - no host port is published.
       - OLLAMA_HOST=0.0.0.0:11434
       # Web search via apps/searxng, called container-to-container (never
@@ -41,9 +41,9 @@ services:
       - traefik.http.routers.openwebui-secure.service=openwebui
       - traefik.http.routers.openwebui-secure.middlewares=authelia@docker
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true

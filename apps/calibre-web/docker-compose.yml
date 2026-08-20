@@ -24,9 +24,9 @@ services:
       - traefik.http.routers.calibreweb-secure.service=calibreweb
       - traefik.http.routers.calibreweb-secure.middlewares=authelia@docker
     networks:
-      - anarchy-pizza
+      - homelab
 
 networks:
-  anarchy-pizza:
-    name: anarchy-pizza
+  homelab:
+    name: homelab
     external: true
