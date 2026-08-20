@@ -107,7 +107,7 @@ All apps below are live in k3s (`k8s/apps/<app>/`), each its own Argo CD child `
 
 For the full blow-by-blow of how this stack got here — every gotcha, every bug, every decision and why, across both the original Compose-era SSO rollout and the later Compose→Kubernetes migration — see **`migration_plan.md`**. A working log, not a polished doc, but the ground truth for anything not obvious from the manifests themselves.
 
-Individual production incidents (real outages, root cause, fix, follow-up) are written up under **`incidents/`** as they happen — `migration_plan.md` links the ones that directly shaped a design decision, but the directory itself is the full list.
+Individual production incidents (real outages, root cause, fix, follow-up) are written up under **`docs/incidents/`** as they happen — `migration_plan.md` and `docs/architecture_record/` link the ones that directly shaped a design decision, but the directory itself is the full list.
 
 ## 🔒 Security Notes
 

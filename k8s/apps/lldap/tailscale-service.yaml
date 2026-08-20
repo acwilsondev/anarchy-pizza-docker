@@ -2,7 +2,7 @@
 # tailnet via the Tailscale Kubernetes Operator, matching the original
 # Compose posture (127.0.0.1 bind + `tailscale serve`, admin UI only,
 # fixed after the Aug 9 boot-race incident - see
-# incidents/2026-08-09-lldap-authelia-outage.md). A separate Service
+# docs/incidents/2026-08-09-lldap-authelia-outage.md). A separate Service
 # from the main `lldap` one (which also carries the raw LDAP port used
 # internally by Authelia) so tailnet exposure stays scoped to just the
 # admin UI, same as before.
