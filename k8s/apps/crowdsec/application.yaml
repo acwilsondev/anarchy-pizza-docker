@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crowdsec
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://crowdsecurity.github.io/helm-charts
+      chart: crowdsec
+      targetRevision: 0.18.1
+      helm:
+        valueFiles:
+          - $values/k8s/apps/crowdsec/values.yaml
+    - repoURL: git@github.com:acwilsondev/homelab-docker.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crowdsec
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  # The chart falls back to Helm's lookup() to reuse the existing
+  # crowdsec-lapi-secrets Secret when lapi.secrets.* is left unset in
+  # values.yaml (see templates/_helpers.tpl). lookup() is known to behave
+  # inconsistently during Argo CD's diff/selfHeal passes, which could
+  # otherwise regenerate this secret and break the already-registered
+  # Traefik bouncer. Never set the actual secret values in values.yaml
+  # instead (this repo is public) - ignore diffs on this Secret's data
+  # so selfHeal can never touch it.
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: crowdsec-lapi-secrets
+      jsonPointers:
+        - /data

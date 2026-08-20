@@ -1,0 +1,26 @@
+# lapi.secrets (csLapiSecret, registrationToken) intentionally left unset.
+# They already exist in-cluster as the crowdsec-lapi-secrets Secret from the
+# original hand-run `helm install`; the chart reuses them via Helm's
+# lookup() (see application.yaml's ignoreDifferences for why that's safe
+# under Argo CD's selfHeal). Never put live secret values here - this repo
+# is public.
+container_runtime: containerd
+
+agent:
+  acquisition:
+    - namespace: traefik
+      podName: traefik-*
+      program: traefik
+    - namespace: vaultwarden
+      podName: vaultwarden-*
+      program: Vaultwarden
+  env:
+    - name: COLLECTIONS
+      value: "crowdsecurity/traefik crowdsecurity/http-cve Dominic-Wagner/vaultwarden"
+
+lapi:
+  persistentVolume:
+    config:
+      size: 100Mi
+    data:
+      size: 512Mi
