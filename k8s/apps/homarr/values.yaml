@@ -4,7 +4,7 @@ controllers:
       main:
         image:
           repository: ghcr.io/homarr-labs/homarr
-          tag: v1.32.0
+          tag: v1.76.0
         env:
           TZ: America/Denver
           BASE_URL: "https://homarr.anarchy.pizza"
