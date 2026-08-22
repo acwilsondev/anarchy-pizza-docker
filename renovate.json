@@ -6,7 +6,9 @@
   "prConcurrentLimit": 5,
   "labels": ["dependencies"],
   "helm-values": {
-    "fileMatch": ["^k8s/apps/[^/]+/values\\.yaml$"]
+    "managerFilePatterns": [
+      "/^k8s/apps/[^/]+/values\\.yaml$/"
+    ]
   },
   "packageRules": [
     {
